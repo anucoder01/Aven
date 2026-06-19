@@ -1,0 +1,280 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=DM+Serif+Display:ital@0;1&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ─── CSS Variables ─── */
+:root {
+  --void: #07071a;
+  --deep: #0a0a20;
+  --surface: #111132;
+  --panel: #161640;
+  --border: #252560;
+  --teal: #2dd4bf;
+  --violet: #a78bfa;
+  --rose: #fb7185;
+  --amber: #fbbf24;
+  --text-primary: #e8e8ff;
+  --text-secondary: #9898cc;
+  --text-muted: #5a5a8a;
+}
+
+/* ─── Base Reset ─── */
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  background-color: var(--void);
+  color: var(--text-primary);
+  font-family: 'Inter', system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  overflow-x: hidden;
+}
+
+/* ─── Scrollbar ─── */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: var(--deep);
+}
+::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--teal);
+}
+
+/* ─── Glassmorphism Utilities ─── */
+@layer components {
+  .glass {
+    @apply bg-white/[0.03] backdrop-blur-xl border border-white/[0.06];
+    box-shadow: 0 8px 32px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.05);
+  }
+
+  .glass-strong {
+    @apply bg-white/[0.06] backdrop-blur-2xl border border-white/[0.08];
+    box-shadow: 0 16px 48px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.08);
+  }
+
+  .glass-teal {
+    @apply bg-teal-500/[0.06] backdrop-blur-xl border border-teal-400/[0.15];
+    box-shadow: 0 8px 32px rgba(45,212,191,0.1), inset 0 1px 0 rgba(45,212,191,0.05);
+  }
+
+  .glass-violet {
+    @apply bg-violet-500/[0.06] backdrop-blur-xl border border-violet-400/[0.15];
+    box-shadow: 0 8px 32px rgba(167,139,250,0.1), inset 0 1px 0 rgba(167,139,250,0.05);
+  }
+
+  .glass-rose {
+    @apply bg-rose-500/[0.08] backdrop-blur-xl border border-rose-400/[0.2];
+    box-shadow: 0 8px 32px rgba(251,113,133,0.15), inset 0 1px 0 rgba(251,113,133,0.05);
+  }
+
+  .btn-primary {
+    @apply relative inline-flex items-center gap-2 px-6 py-3 rounded-xl font-medium text-void transition-all duration-200;
+    background: linear-gradient(135deg, #2dd4bf, #8b5cf6);
+    box-shadow: 0 4px 20px rgba(45,212,191,0.3);
+  }
+  .btn-primary:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 8px 30px rgba(45,212,191,0.4);
+  }
+  .btn-primary:active {
+    transform: translateY(0);
+  }
+
+  .btn-ghost {
+    @apply inline-flex items-center gap-2 px-4 py-2 rounded-lg text-text-secondary border border-white/[0.06] transition-all duration-200;
+  }
+  .btn-ghost:hover {
+    @apply text-text-primary bg-white/[0.04] border-white/[0.12];
+  }
+
+  .btn-danger {
+    @apply inline-flex items-center gap-2 px-4 py-2 rounded-lg text-rose-400 border border-rose-400/20 transition-all duration-200;
+    background: rgba(251,113,133,0.06);
+  }
+  .btn-danger:hover {
+    background: rgba(251,113,133,0.12);
+    @apply border-rose-400/40;
+  }
+
+  /* ─── Distortion Badges ─── */
+  .badge-distortion {
+    @apply inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium;
+  }
+  .badge-catastrophizing { @apply bg-rose-500/20 text-rose-400 border border-rose-400/20; }
+  .badge-mind_reading { @apply bg-violet-500/20 text-violet-400 border border-violet-400/20; }
+  .badge-all_or_nothing { @apply bg-amber-500/20 text-amber-400 border border-amber-400/20; }
+  .badge-personalization { @apply bg-teal-500/20 text-teal-400 border border-teal-400/20; }
+  .badge-fortune_telling { @apply bg-purple-500/20 text-purple-300 border border-purple-400/20; }
+  .badge-should_statements { @apply bg-orange-500/20 text-orange-400 border border-orange-400/20; }
+  .badge-emotional_reasoning { @apply bg-pink-500/20 text-pink-400 border border-pink-400/20; }
+  .badge-labeling { @apply bg-indigo-500/20 text-indigo-400 border border-indigo-400/20; }
+
+  /* ─── Scenario Cards 3D Tilt ─── */
+  .scenario-card {
+    @apply glass rounded-2xl p-6 cursor-pointer transition-all duration-300;
+    transform-style: preserve-3d;
+    transform: perspective(1000px);
+  }
+  .scenario-card:hover {
+    box-shadow: 0 20px 60px rgba(0,0,0,0.5), 0 0 40px rgba(45,212,191,0.1);
+  }
+
+  /* ─── Severity Bar ─── */
+  .severity-bar {
+    @apply h-1.5 rounded-full overflow-hidden bg-white/[0.06];
+  }
+  .severity-fill {
+    @apply h-full rounded-full transition-all duration-700;
+    background: linear-gradient(90deg, #2dd4bf, #8b5cf6, #fb7185);
+  }
+
+  /* ─── Chat Bubbles ─── */
+  .chat-bubble-user {
+    @apply rounded-2xl rounded-br-sm px-4 py-3 max-w-[80%] text-sm leading-relaxed;
+    background: linear-gradient(135deg, rgba(45,212,191,0.12), rgba(139,92,246,0.12));
+    border: 1px solid rgba(45,212,191,0.15);
+  }
+  .chat-bubble-ai {
+    @apply glass rounded-2xl rounded-bl-sm px-4 py-3 max-w-[80%] text-sm leading-relaxed;
+  }
+
+  /* ─── Input Styles ─── */
+  .aven-input {
+    @apply w-full bg-white/[0.03] border border-white/[0.06] rounded-xl px-4 py-3 text-text-primary placeholder-text-muted text-sm outline-none transition-all duration-200;
+  }
+  .aven-input:focus {
+    @apply border-teal-400/30 bg-white/[0.05];
+    box-shadow: 0 0 0 3px rgba(45,212,191,0.08);
+  }
+
+  /* ─── Progress Ring ─── */
+  .progress-ring circle {
+    transition: stroke-dashoffset 1.5s cubic-bezier(0.16, 1, 0.3, 1);
+    transform: rotate(-90deg);
+    transform-origin: 50% 50%;
+  }
+}
+
+/* ─── Aurora Gradient Animation ─── */
+.aurora-bg {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.aurora-layer {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(80px);
+  opacity: 0.12;
+  animation: drift linear infinite;
+}
+
+@keyframes drift {
+  0% { transform: translate(0, 0) scale(1); }
+  33% { transform: translate(5%, -8%) scale(1.05); }
+  66% { transform: translate(-3%, 5%) scale(0.97); }
+  100% { transform: translate(0, 0) scale(1); }
+}
+
+/* ─── Gradient Text ─── */
+.gradient-text {
+  background: linear-gradient(135deg, #2dd4bf 0%, #a78bfa 50%, #fb7185 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.gradient-text-teal {
+  background: linear-gradient(135deg, #2dd4bf, #a78bfa);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* ─── Shimmer Loading ─── */
+.shimmer {
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.04), transparent);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s linear infinite;
+}
+
+/* ─── Waveform Canvas ─── */
+#waveform-canvas {
+  width: 100%;
+  height: 48px;
+}
+
+/* ─── Page Transition ─── */
+.page-enter {
+  animation: slideUp 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* ─── Distortion Highlight in Quotes ─── */
+.distortion-quote {
+  @apply relative inline;
+  border-bottom: 1.5px solid;
+  border-radius: 2px;
+}
+
+/* ─── Recharts Overrides ─── */
+.recharts-cartesian-grid-horizontal line,
+.recharts-cartesian-grid-vertical line {
+  stroke: rgba(255,255,255,0.04) !important;
+}
+
+.recharts-text {
+  fill: var(--text-muted) !important;
+  font-size: 11px !important;
+  font-family: 'Inter', sans-serif !important;
+}
+
+.recharts-tooltip-wrapper {
+  outline: none !important;
+}
+
+/* ─── Custom Select ─── */
+select {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%235a5a8a'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  background-size: 16px;
+  appearance: none;
+  -webkit-appearance: none;
+}
+
+/* ─── Floating Animation ─── */
+@keyframes floatY {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-12px); }
+}
+.float-anim {
+  animation: floatY 6s ease-in-out infinite;
+}
+
+/* ─── Glow Pulse ─── */
+@keyframes glowPulse {
+  0%, 100% { box-shadow: 0 0 20px rgba(45,212,191,0.2); }
+  50% { box-shadow: 0 0 40px rgba(45,212,191,0.5), 0 0 80px rgba(45,212,191,0.2); }
+}
+.glow-pulse {
+  animation: glowPulse 3s ease-in-out infinite;
+}
