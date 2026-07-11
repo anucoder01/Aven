@@ -66,6 +66,10 @@ class CharacterRequest(BaseModel):
     difficulty_level: Optional[int] = 1
 
 
+class GenerateScenarioRequest(BaseModel):
+    prompt: str
+
+
 class ReportRequest(BaseModel):
     transcript: List[Message]
     distortion_events: List[dict]
@@ -239,3 +243,78 @@ async def generate_report(req: ReportRequest):
     except Exception as e:
         print(f"Error generating report: {e}")
         return {"error": str(e), "traceback": "Check backend logs"}
+
+
+@router.post("/generate-scenario")
+async def generate_scenario(req: GenerateScenarioRequest):
+    """Generate a custom CBT scenario based on user prompt."""
+    import time
+    client, provider = get_llm_client()
+    
+    # Fallback if no LLM configured
+    if not client or provider not in ["openai", "groq"]:
+        return {
+            "id": f"custom_{int(time.time())}",
+            "name": "Custom AI Character",
+            "scenario": "Custom Scenario",
+            "domain": "custom",
+            "icon": "✨",
+            "identity": f"A generated persona based on: '{req.prompt}'",
+            "vocab": "Natural conversational tone.",
+            "levels": [
+                {"level": 1, "label": "Cooperative and open to listening."},
+                {"level": 2, "label": "Slightly guarded but engaged."},
+                {"level": 3, "label": "Neutral, challenging some points."},
+                {"level": 4, "label": "Skeptical, dismissive of concerns."},
+                {"level": 5, "label": "Actively hostile or difficult."}
+            ],
+            "responseMap": {
+                "User starts conversation": "Responds according to difficulty level."
+            },
+            "systemPrompt": f"You are a custom AI character generated based on: '{req.prompt}'. RULES: Respond directly to what the user says. Match the difficulty level. USER SAID: {{user_message}}. HISTORY: {{history}}. DIFFICULTY: {{level}} — {{level_desc}}"
+        }
+
+    prompt_instructions = f"""
+    You are an expert CBT scenario designer for a social anxiety training app.
+    The user needs to practice a specific upcoming stressful event.
+    User prompt: "{req.prompt}"
+
+    Generate a complete JSON object matching this schema for the character they will talk to:
+    {{
+      "id": "A unique lowercase snake_case string (e.g. 'custom_boss_sarah_123')",
+      "name": "Name of the character",
+      "scenario": "Short title of the scenario (e.g. 'Performance Review with Sarah')",
+      "domain": "custom",
+      "icon": "A single suitable emoji",
+      "identity": "2-3 sentences describing who they are and their core personality trait",
+      "vocab": "Short description of how they talk (e.g. 'Corporate buzzwords, passive aggressive')",
+      "levels": [
+        {{"level": 1, "label": "Cooperative and warm."}},
+        {{"level": 2, "label": "Slightly guarded."}},
+        {{"level": 3, "label": "Neutral, pushes back."}},
+        {{"level": 4, "label": "Skeptical, dismissive."}},
+        {{"level": 5, "label": "Hostile or very difficult."}}
+      ],
+      "responseMap": {{
+        "User action description": "Character response description",
+        "Another user action": "Another response"
+      }},
+      "systemPrompt": "You are [Name]... RULES: Respond to what they said... USER SAID: {{user_message}}. HISTORY: {{history}}. DIFFICULTY: {{level}} — {{level_desc}}"
+    }}
+    IMPORTANT: Do not wrap in markdown tags like ```json. Return raw valid JSON. Make sure the 'id' includes random numbers so it's unique.
+    """
+
+    try:
+        model_name = "llama-3.3-70b-versatile" if provider == "groq" else "gpt-4o"
+        response = await client.chat.completions.create(
+            model=model_name,
+            messages=[{"role": "system", "content": prompt_instructions}],
+            temperature=0.7,
+            response_format={"type": "json_object"}
+        )
+        data = json.loads(response.choices[0].message.content)
+        return data
+    except Exception as e:
+        print(f"Error generating custom scenario: {e}")
+        return {"error": str(e), "traceback": "Check backend logs"}
+
