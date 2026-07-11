@@ -8,6 +8,7 @@ import WaveformVisualizer from '../components/chat/WaveformVisualizer'
 import DistortionBadge from '../components/chat/DistortionBadge'
 import { useSessionStore } from '../store/sessionStore'
 import { useCharacterMemoryStore } from '../store/characterMemoryStore'
+import { useUserStore } from '../store/userStore'
 import { DISTORTION_LABELS } from '../data/scenarios'
 import { characters } from '../data/characterLibrary'
 import { classifyMessage, detectAvoidance } from '../data/mockData'
@@ -123,7 +124,9 @@ function LiveStatsPanel({ stats }) {
 export default function SessionPage() {
   const { scenarioId, levelNum } = useParams()
   const navigate = useNavigate()
-  const scenario = characters.find(s => s.id === scenarioId) || characters[0]
+  const { customScenarios } = useUserStore()
+  
+  const scenario = characters.find(s => s.id === scenarioId) || customScenarios?.find(s => s.id === scenarioId) || characters[0]
   const level = scenario.levels.find(l => l.level === parseInt(levelNum)) || scenario.levels[0]
 
   const { messages, liveStats, isCharacterTyping, voiceMode, isRecording,

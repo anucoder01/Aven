@@ -23,6 +23,7 @@ export const CHARACTER_DOMAINS = [
   { id: 'romantic', label: 'Romantic', icon: '💛', color: '#f472b6' },
   { id: 'performance', label: 'Performance', icon: '📊', color: '#34d399' },
   { id: 'stranger', label: 'Stranger', icon: '🗺️', color: '#2dd4bf' },
+  { id: 'custom', label: 'Custom', icon: '✨', color: '#fcd34d' },
 ];
 
 export const characters: Character[] = [

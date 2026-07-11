@@ -1,7 +1,7 @@
 import { useState, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Brain, Mic, BarChart3, Shield, ChevronRight, Sparkles, Star, Lock } from 'lucide-react'
+import { Brain, Mic, BarChart3, Shield, ChevronRight, Sparkles, Star, Lock, Plus, Loader2 } from 'lucide-react'
 import AvenOrb from '../components/3d/AvenOrb'
 import AuroraBackground from '../components/3d/AuroraBackground'
 import { characters as SCENARIOS, CHARACTER_DOMAINS as DOMAINS } from '../data/characterLibrary'
@@ -30,20 +30,47 @@ export default function LandingPage() {
   const [selectedDomain, setSelectedDomain] = useState(null)
   const [selectedScenario, setSelectedScenario] = useState(null)
   const [selectedLevel, setSelectedLevel] = useState(1)
-  const { user, progressData } = useUserStore()
+  const { user, completedReports, customScenarios, addCustomScenario } = useUserStore()
+  const [customPrompt, setCustomPrompt] = useState('')
+  const [isGenerating, setIsGenerating] = useState(false)
 
   const scenariosInDomain = selectedDomain
-    ? SCENARIOS.filter(s => s.domain === selectedDomain)
+    ? (selectedDomain === 'custom' ? customScenarios || [] : SCENARIOS.filter(s => s.domain === selectedDomain))
     : []
 
   const domain = DOMAINS.find(d => d.id === selectedDomain)
 
-  const maxLevel = selectedScenario ? getMaxUnlockedLevel(selectedScenario.id, progressData.sessions) : 1
+  const maxLevel = selectedScenario ? getMaxUnlockedLevel(selectedScenario.id, completedReports) : 1
+
+  const handleGenerateScenario = async () => {
+    if (!customPrompt.trim() || isGenerating) return
+    setIsGenerating(true)
+    try {
+      const res = await fetch('http://localhost:8000/llm/generate-scenario', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prompt: customPrompt })
+      })
+      const data = await res.json()
+      if (data && data.id) {
+        addCustomScenario(data)
+        setCustomPrompt('')
+        handleScenarioSelect(data)
+      } else {
+        alert("Failed to generate scenario. Check backend.")
+      }
+    } catch (e) {
+      console.error(e)
+      alert("Error calling backend to generate scenario.")
+    } finally {
+      setIsGenerating(false)
+    }
+  }
 
   const handleScenarioSelect = (scenario) => {
     setSelectedScenario(scenario)
     // Default to highest unlocked level or 1
-    const unlocked = getMaxUnlockedLevel(scenario.id, progressData.sessions)
+    const unlocked = getMaxUnlockedLevel(scenario.id, completedReports)
     setSelectedLevel(unlocked)
   }
 
@@ -148,8 +175,37 @@ export default function LandingPage() {
                 </h2>
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 gap-3">
+                {selectedDomain === 'custom' && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="relative overflow-hidden glass rounded-xl p-4 flex flex-col justify-center items-center gap-3 border-dashed border-white/[0.2] hover:border-teal-400/50 transition-all col-span-1 sm:col-span-2 lg:col-span-4 xl:col-span-5"
+                  >
+                    <div className="w-full max-w-xl flex flex-col gap-3">
+                      <div className="text-sm text-text-primary font-medium flex items-center gap-2">
+                        <Sparkles size={16} className="text-teal-400" /> Create Custom Scenario
+                      </div>
+                      <textarea
+                        value={customPrompt}
+                        onChange={e => setCustomPrompt(e.target.value)}
+                        placeholder="Describe your upcoming event... (e.g. 'I have a performance review tomorrow with my passive-aggressive boss.')"
+                        className="aven-input w-full text-sm py-3 h-24 resize-none"
+                        disabled={isGenerating}
+                      />
+                      <button
+                        onClick={handleGenerateScenario}
+                        disabled={isGenerating || !customPrompt.trim()}
+                        className="btn-primary w-full justify-center disabled:opacity-50"
+                      >
+                        {isGenerating ? <><Loader2 size={16} className="animate-spin" /> Generating AI Persona...</> : <><Plus size={16} /> Generate Scenario</>}
+                      </button>
+                    </div>
+                  </motion.div>
+                )}
+
                 {scenariosInDomain.map((scenario, i) => {
-                  const unlocked = getMaxUnlockedLevel(scenario.id, progressData.sessions)
+                  // Custom scenarios default to level 5 unlocked or handled via typical logic
+                  const unlocked = selectedDomain === 'custom' ? 5 : getMaxUnlockedLevel(scenario.id, completedReports)
                   return (
                     <motion.div
                       key={scenario.id}
@@ -160,10 +216,10 @@ export default function LandingPage() {
                       className={`relative overflow-hidden glass rounded-xl p-4 cursor-pointer transition-all ${
                         selectedScenario?.id === scenario.id ? 'border-white/[0.15]' : 'hover:border-white/[0.1]'
                       }`}
-                      style={selectedScenario?.id === scenario.id ? { borderColor: `${scenario.accentColor}50` } : {}}
+                      style={selectedScenario?.id === scenario.id ? { borderColor: `${scenario.accentColor || '#2dd4bf'}50` } : {}}
                     >
                       {selectedScenario?.id === scenario.id && (
-                        <div className={`absolute inset-0 bg-gradient-to-br ${scenario.gradient} opacity-40`} />
+                        <div className={`absolute inset-0 bg-gradient-to-br ${scenario.gradient || 'from-teal-500/20 to-purple-500/20'} opacity-40`} />
                       )}
                       <div className="relative z-10">
                         <div className="flex items-start justify-between mb-2">
