@@ -10,6 +10,7 @@ import AuroraBackground from '../components/3d/AuroraBackground'
 import { useUserStore } from '../store/userStore'
 import { DISTORTION_LABELS } from '../data/scenarios'
 import { ClinicalTracker, ExposureLogger, InsightEngine } from '../components/progress/ProgressComponents'
+import SkillTree from '../components/progress/SkillTree'
 
 const CustomTooltip = ({ active, payload, label }) => {
   if (!active || !payload?.length) return null
@@ -158,6 +159,7 @@ export default function DashboardPage() {
     { id: 'clinical', label: 'Clinical' },
     { id: 'insights', label: 'Insights' },
     { id: 'exposures', label: 'Real World' },
+    { id: 'skill-tree', label: 'Skill Tree' },
   ]
 
   return (
@@ -376,6 +378,12 @@ export default function DashboardPage() {
         {activeTab === 'exposures' && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-4">
             <ExposureLogger />
+          </motion.div>
+        )}
+
+        {activeTab === 'skill-tree' && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-4">
+            <SkillTree />
           </motion.div>
         )}
       </div>
