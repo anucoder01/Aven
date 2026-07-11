@@ -12,6 +12,11 @@ export const useUserStore = create(
         improvementPct: 0,
       },
       completedReports: [],
+      customScenarios: [],
+
+      addCustomScenario: (scenario) => set((state) => ({
+        customScenarios: [...state.customScenarios, scenario]
+      })),
 
       addReport: (report) => set((state) => {
         const newReports = [...state.completedReports, { ...report, id: Date.now() }];
