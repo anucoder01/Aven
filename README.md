@@ -35,6 +35,7 @@ Aven prioritizes user safety above all else.
 - **SUDS Tracking:** Mid-session Subjective Units of Distress Scale (SUDS) checks. If SUDS > 75, the app automatically triggers a pause protocol.
 - **Crisis NLP Detector:** A separate, async NLP pipeline constantly monitors for crisis language, surfacing immediate helpline resources and safely terminating the session.
 - **Integrated Breathing Tools:** Physiological sighs and 4-7-8 breathing are embedded directly into the UI as panic buttons.
+- **Ambient Grounding Soundscapes:** A procedural Web Audio API engine that generates soothing brown noise (like distant rain or a cafe murmur) to anchor the user and reduce silence-induced anxiety during the simulation.
 
 ---
 
