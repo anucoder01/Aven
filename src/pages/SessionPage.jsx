@@ -13,6 +13,7 @@ import { DISTORTION_LABELS } from '../data/scenarios'
 import { characters } from '../data/characterLibrary'
 import { classifyMessage, detectAvoidance } from '../data/mockData'
 import { sessionEngine } from '../services/sessionEngine'
+import { soundscapeEngine } from '../services/soundscapeEngine'
 
 const DISTORTION_COLORS = {
   catastrophizing: '#fb7185',
@@ -136,12 +137,19 @@ export default function SessionPage() {
   const [inputText, setInputText] = useState('')
   const [orbState, setOrbState] = useState('idle')
   const [sessionEnded, setSessionEnded] = useState(false)
+  const [isSoundscapeActive, setIsSoundscapeActive] = useState(false)
   const chatBottomRef = useRef(null)
   const inputRef = useRef(null)
   const recognitionRef = useRef(null)
 
   const { buildMemoryContext } = useCharacterMemoryStore()
   const memoryContextRef = useRef('')
+
+  useEffect(() => {
+    return () => {
+      soundscapeEngine.cleanup()
+    }
+  }, [])
 
   // Init session — use ref guard to prevent StrictMode double-fire
   const greetingSent = useRef(false)
@@ -364,6 +372,16 @@ export default function SessionPage() {
     navigate('/report')
   }
 
+  const toggleSoundscape = () => {
+    if (isSoundscapeActive) {
+      soundscapeEngine.stop()
+      setIsSoundscapeActive(false)
+    } else {
+      soundscapeEngine.start()
+      setIsSoundscapeActive(true)
+    }
+  }
+
   const difficultyColor = ['', '#2dd4bf', '#a78bfa', '#fbbf24', '#fb923c', '#fb7185'][level.level] || '#2dd4bf'
 
   return (
@@ -389,6 +407,17 @@ export default function SessionPage() {
           >
             L{level.level} — {level.label}
           </span>
+          <button
+            onClick={toggleSoundscape}
+            className={`flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg border transition-all ${
+              isSoundscapeActive 
+                ? 'text-teal-400 border-teal-400/20 bg-teal-400/10' 
+                : 'text-text-muted border-white/[0.04] hover:bg-white/[0.02]'
+            }`}
+          >
+            {isSoundscapeActive ? <Volume2 size={12} /> : <VolumeX size={12} />}
+            {isSoundscapeActive ? 'Soundscape On' : 'Soundscape Off'}
+          </button>
           <button
             onClick={handleEndSession}
             className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg text-rose-400 border border-rose-400/20 hover:bg-rose-400/10 transition-all"
