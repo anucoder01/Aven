@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Brain, Dumbbell, HeartPulse, BarChart3, Lightbulb, Shield, ChevronLeft, ChevronRight, Mic, Menu, X } from 'lucide-react'
+import { Brain, Dumbbell, HeartPulse, BarChart3, Lightbulb, Shield, ChevronLeft, ChevronRight, Mic, Menu, X, Users } from 'lucide-react'
 
 const NAV_ITEMS = [
   { id: 'practice',  label: 'Practice',       icon: Dumbbell,   path: '/',          description: '25 scenarios · 5 levels each' },
@@ -9,6 +9,8 @@ const NAV_ITEMS = [
   { id: 'body',      label: 'Body',           icon: HeartPulse, path: '/body',      description: 'Physiology & breathing' },
   { id: 'progress',  label: 'Progress',       icon: BarChart3,  path: '/dashboard', description: 'Trajectory & assessments' },
   { id: 'insights',  label: 'Insights',       icon: Lightbulb,  path: '/insights',  description: 'Personal patterns & engine' },
+  { id: 'builder',   label: 'Scenario Builder',icon: Dumbbell,   path: '/scenario-builder', description: 'Design custom exposure' },
+  { id: 'therapist', label: 'Clinician Portal',icon: Users,      path: '/therapist-portal', description: 'Patient dashboard' },
   { id: 'safety',    label: 'Safety',         icon: Shield,     path: '/safety',    description: 'Crisis · therapist · limits' },
 ]
 
