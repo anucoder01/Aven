@@ -7,6 +7,8 @@ import DashboardPage from './pages/DashboardPage'
 import SafetyPage from './pages/SafetyPage'
 import TherapyPage from './pages/TherapyPage'
 import BodyPage from './pages/BodyPage'
+import CustomScenarioBuilder from './pages/CustomScenarioBuilder'
+import TherapistDashboardPage from './pages/TherapistDashboardPage'
 
 export default function App() {
   return (
@@ -20,6 +22,8 @@ export default function App() {
         <Route path="/therapy" element={<TherapyPage />} />
         <Route path="/body" element={<BodyPage />} />
         <Route path="/insights" element={<DashboardPage />} />
+        <Route path="/scenario-builder" element={<CustomScenarioBuilder />} />
+        <Route path="/therapist-portal" element={<TherapistDashboardPage />} />
       </Routes>
     </Sidebar>
   )
