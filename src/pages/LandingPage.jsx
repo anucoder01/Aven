@@ -33,6 +33,7 @@ export default function LandingPage() {
   const { user, completedReports, customScenarios, addCustomScenario } = useUserStore()
   const [customPrompt, setCustomPrompt] = useState('')
   const [isGenerating, setIsGenerating] = useState(false)
+  const [isReversal, setIsReversal] = useState(false)
 
   const scenariosInDomain = selectedDomain
     ? (selectedDomain === 'custom' ? customScenarios || [] : SCENARIOS.filter(s => s.domain === selectedDomain))
@@ -76,7 +77,9 @@ export default function LandingPage() {
 
   const handleStartSession = () => {
     if (!selectedScenario) return
-    navigate(`/session/${selectedScenario.id}/${selectedLevel}`)
+    let url = `/session/${selectedScenario.id}/${selectedLevel}`
+    if (isReversal) url += `?mode=reversal`
+    navigate(url)
   }
 
   return (
@@ -310,6 +313,19 @@ export default function LandingPage() {
                       ✦ This character remembers your last session
                     </div>
                   )}
+                </div>
+
+                <div className="flex items-center gap-3 glass rounded-xl p-3 border border-white/[0.04]">
+                  <div className="flex-1">
+                    <div className="text-sm font-medium text-text-primary">Role Reversal Mode</div>
+                    <div className="text-[10px] text-text-muted">You play the antagonist. The AI models a healthy response.</div>
+                  </div>
+                  <button 
+                    onClick={() => setIsReversal(!isReversal)}
+                    className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${isReversal ? 'bg-teal-500' : 'bg-white/[0.1]'}`}
+                  >
+                    <span className={`inline-block h-3 w-3 transform rounded-full bg-white transition-transform ${isReversal ? 'translate-x-5' : 'translate-x-1'}`} />
+                  </button>
                 </div>
 
                 <motion.button
