@@ -68,7 +68,8 @@ export const sessionEngine = {
     characterId: string,
     difficultyLevel: 1 | 2 | 3 | 4 | 5,
     conversationHistory: Message[],
-    userMessage: string
+    userMessage: string,
+    isReversal: boolean = false
   ): string {
     const character = characters.find(c => c.id === characterId);
     if (!character) throw new Error(`Character ${characterId} not found`);
@@ -82,6 +83,10 @@ export const sessionEngine = {
 
     let prompt = character.systemPrompt;
     
+    if (isReversal) {
+      prompt = `ROLE REVERSAL MODE: The human user is playing the role of ${character.name}, who is: ${character.identity}. You, the AI, are playing the role of the User (a healthy, assertive individual setting boundaries). Model ideal communication, emotional regulation, and cognitive flexibility. Do not fall into the traps of the antagonist. \n\nAntagonist prompt context (for your reference on how they might act): ${prompt}`;
+    }
+
     // Replace template variables
     prompt = prompt.replace('{user_message}', userMessage);
     prompt = prompt.replace('{history}', historySummary);
@@ -89,7 +94,7 @@ export const sessionEngine = {
     prompt = prompt.replace('{level_desc}', levelObj.label);
 
     const guidance = this.getResponseMapGuidance(characterId, userMessage);
-    if (guidance) {
+    if (guidance && !isReversal) {
       prompt += `\n\n${guidance}`;
     }
 
