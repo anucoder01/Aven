@@ -8,6 +8,7 @@ import { useTherapyStore } from '../store/therapyStore'
 import { useUserStore } from '../store/userStore'
 import { MOCK_CBT_REPORT } from '../data/mockData'
 import { DISTORTION_LABELS } from '../data/scenarios'
+import { Star } from 'lucide-react'
 
 function AssertivenessMeter({ score }) {
   const [displayed, setDisplayed] = useState(0)
@@ -274,6 +275,19 @@ export default function ReportPage() {
     )
   }
 
+  // Calculate XP gained from this session
+  const totalDistortions = report.top_distortions?.reduce((sum, d) => sum + (d.count || 0), 0) || 0
+  let earnedXP = 20 // Base consistency XP for finishing session
+  
+  if (report.assertiveness_score > 5) {
+    earnedXP += Math.round((report.assertiveness_score - 5) * 10)
+  }
+  if (totalDistortions <= 1) earnedXP += 50
+  else if (totalDistortions <= 3) earnedXP += 20
+  
+  // +10 for each severity level if difficulty was high
+  earnedXP += (report.difficulty_level || 1) * 10
+
   return (
     <div className="min-h-screen relative" style={{ background: '#07071a' }}>
       <AuroraBackground />
@@ -324,6 +338,29 @@ export default function ReportPage() {
                 <div className="text-lg font-bold text-teal-400">{report.session_duration_minutes || 5}m</div>
                 <div className="text-[10px] text-text-muted">Duration</div>
               </div>
+            </div>
+          </div>
+        </motion.div>
+
+        {/* Gamification panel */}
+        <motion.div
+          initial={{ opacity: 0, scale: 0.95, y: 10 }}
+          animate={{ opacity: 1, scale: 1, y: 0 }}
+          transition={{ delay: 0.2, type: 'spring' }}
+          className="glass rounded-xl p-5 mb-6 bg-gradient-to-r from-violet-500/10 to-teal-400/10 border border-white/[0.08]"
+        >
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-full bg-teal-400/20 flex items-center justify-center">
+                <Star size={20} className="text-teal-400" />
+              </div>
+              <div>
+                <h3 className="font-bold text-text-primary">XP Earned</h3>
+                <p className="text-xs text-text-muted">+{earnedXP} points towards your next level!</p>
+              </div>
+            </div>
+            <div className="text-right">
+              <div className="text-2xl font-black text-teal-400">+{earnedXP}</div>
             </div>
           </div>
         </motion.div>
