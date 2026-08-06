@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { useNavigate, useParams, useLocation } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Mic, MicOff, Send, ChevronLeft, AlertTriangle, Brain, Eye, Zap, Volume2, VolumeX, StopCircle } from 'lucide-react'
 import AvenOrb from '../components/3d/AvenOrb'
@@ -125,6 +125,9 @@ function LiveStatsPanel({ stats }) {
 export default function SessionPage() {
   const { scenarioId, levelNum } = useParams()
   const navigate = useNavigate()
+  const location = useLocation()
+  const queryParams = new URLSearchParams(location.search)
+  const isReversal = queryParams.get('mode') === 'reversal'
   const { customScenarios } = useUserStore()
   
   const scenario = characters.find(s => s.id === scenarioId) || customScenarios?.find(s => s.id === scenarioId) || characters[0]
@@ -170,7 +173,13 @@ export default function SessionPage() {
       setCharacterTyping(true)
       setOrbState('speaking')
       try {
-        const sysPrompt = sessionEngine.buildSystemPrompt(scenario.id, level.level, [], "The user just walked up to you. Start the conversation in character.")
+        const sysPrompt = sessionEngine.buildSystemPrompt(
+          scenario.id, 
+          level.level, 
+          [], 
+          "The user just walked up to you. Start the conversation in character.",
+          isReversal
+        )
         const aiRes = await fetch('http://localhost:8000/llm/character', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
