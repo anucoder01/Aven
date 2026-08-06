@@ -205,7 +205,16 @@ export default function SessionPage() {
         if (!aiResponse) aiResponse = "Hello."
         
         setCharacterTyping(false)
-        addMessage({ role: 'ai', text: aiResponse, characterName: scenario.name })
+
+        let finalName = scenario.name
+        let finalText = aiResponse
+        const match = aiResponse.match(/^([A-Za-z0-9\s]+):\s*(.*)/is)
+        if (match && scenario.isGroup) {
+          finalName = match[1].trim()
+          finalText = match[2].trim()
+        }
+
+        addMessage({ role: 'ai', text: finalText, characterName: finalName })
         setTimeout(() => setOrbState('idle'), 1500)
       } catch (e) {
         console.warn("LLM greeting failed", e)
@@ -323,7 +332,16 @@ export default function SessionPage() {
       if (!aiResponse) aiResponse = "I'm not sure what to say to that."
 
       setCharacterTyping(false)
-      addMessage({ role: 'ai', text: aiResponse, characterName: scenario.name })
+      
+      let finalName = scenario.name
+      let finalText = aiResponse
+      const match = aiResponse.match(/^([A-Za-z0-9\s]+):\s*(.*)/is)
+      if (match && scenario.isGroup) {
+        finalName = match[1].trim()
+        finalText = match[2].trim()
+      }
+
+      addMessage({ role: 'ai', text: finalText, characterName: finalName })
       setTimeout(() => setOrbState('idle'), 1500)
 
     } catch (e) {
