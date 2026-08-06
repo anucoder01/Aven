@@ -21,7 +21,6 @@ export const useUserStore = create(
       addReport: (report) => set((state) => {
         const newReports = [...state.completedReports, { ...report, id: Date.now() }];
         
-        // Calculate dynamic improvement vs first session if we have >1 sessions
         let improvement = 0;
         if (newReports.length > 1) {
           const firstScore = newReports[0].assertiveness_score || 1;
@@ -29,14 +28,16 @@ export const useUserStore = create(
           improvement = Math.round(((currentScore - firstScore) / firstScore) * 100);
         }
 
-        // Simple streak calc (just adds 1 if within 24h, simplified here)
+        // Add to streak
+        const newStreak = state.user.streak + 1;
+
         return {
           completedReports: newReports,
           user: { 
             ...state.user, 
             totalSessions: state.user.totalSessions + 1,
             improvementPct: improvement,
-            streak: state.user.streak === 0 ? 1 : state.user.streak // mock streak
+            streak: newStreak
           },
         };
       }),
