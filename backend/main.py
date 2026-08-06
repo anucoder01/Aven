@@ -8,7 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 import uvicorn
 
-from routers import classifier, llm
+from routers import classifier, llm, scenario, therapist
 from config import settings
 
 
@@ -36,6 +36,8 @@ app.add_middleware(
 
 app.include_router(classifier.router, prefix="/classify", tags=["Classifier"])
 app.include_router(llm.router, prefix="/llm", tags=["LLM"])
+app.include_router(scenario.router, prefix="/scenario", tags=["Scenario"])
+app.include_router(therapist.router, prefix="/therapist", tags=["Therapist"])
 
 
 @app.get("/health")
