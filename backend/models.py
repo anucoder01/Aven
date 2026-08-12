@@ -5,7 +5,7 @@ from database import Base
 
 class User(Base):
     __tablename__ = "users"
-    id = Column(Integer, primary_key=True, index=True)
+    id = Column(String, primary_key=True, index=True)
     username = Column(String, unique=True, index=True)
     
     sessions = relationship("Session", back_populates="user")
@@ -14,7 +14,7 @@ class User(Base):
 class Session(Base):
     __tablename__ = "sessions"
     id = Column(String, primary_key=True, index=True) # UUID string
-    user_id = Column(Integer, ForeignKey("users.id"))
+    user_id = Column(String, ForeignKey("users.id"))
     created_at = Column(DateTime, default=datetime.utcnow)
     
     user = relationship("User", back_populates="sessions")
@@ -46,7 +46,7 @@ class FacialTensionSample(Base):
 class BiomarkerBaseline(Base):
     __tablename__ = "biomarker_baselines"
     id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey("users.id"), unique=True)
+    user_id = Column(String, ForeignKey("users.id"), unique=True)
     avg_pitch = Column(Float, nullable=True)
     avg_jitter = Column(Float, nullable=True)
     avg_shimmer = Column(Float, nullable=True)

@@ -17,6 +17,8 @@ class Settings(BaseSettings):
     elevenlabs_api_key: str = ""
     gemini_api_key: str = ""
     groq_api_key: str = ""
+    ollama_model: str = "llama3.1:8b"
+    ollama_base_url: str = "http://localhost:11434"
 
     # Model
     model_checkpoint_path: str = "./ml/checkpoints/roberta_distortion_v1"
