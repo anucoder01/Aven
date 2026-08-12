@@ -19,6 +19,7 @@ export function BiomarkerConsentModal({ onAccept, onDecline }) {
         <div className="bg-white/5 rounded-xl p-4 text-left mb-6 text-xs text-text-muted space-y-2">
           <p><strong>🔒 Privacy First:</strong> Your camera feed is processed entirely on your device. Video frames are <em>never</em> recorded, uploaded, or stored.</p>
           <p><strong>📊 What we save:</strong> Only numerical scores (e.g. "Tension Index: 45") are sent to your secure profile to track progress over time.</p>
+          <p><strong>⚠️ Note:</strong> Biomarkers are physiological proxies, not clinical diagnoses.</p>
         </div>
 
         <div className="flex gap-3">

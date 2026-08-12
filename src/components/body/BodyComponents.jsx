@@ -348,16 +348,16 @@ export function VocalBiomarkerPanel() {
             <p className="text-xs text-teal-400 mb-2">Baseline established — {biomarkerBaseline.sampleCount} sessions</p>
             <div className="grid grid-cols-3 gap-3 text-center">
               <div>
-                <div className="text-lg font-bold text-text-primary">{biomarkerBaseline.avgPitch?.toFixed(0)} Hz</div>
+                <div className="text-lg font-bold text-text-primary">{biomarkerBaseline.avg_pitch?.toFixed(0)} Hz</div>
                 <div className="text-xs text-text-muted">Avg Pitch</div>
               </div>
               <div>
-                <div className="text-lg font-bold text-text-primary">{biomarkerBaseline.avgRate?.toFixed(1)}</div>
-                <div className="text-xs text-text-muted">Words/sec</div>
+                <div className="text-lg font-bold text-text-primary">{biomarkerBaseline.avg_jitter?.toFixed(2)}%</div>
+                <div className="text-xs text-text-muted">Avg Jitter</div>
               </div>
               <div>
-                <div className="text-lg font-bold text-text-primary">{biomarkerBaseline.avgEnergy?.toFixed(2)}</div>
-                <div className="text-xs text-text-muted">Energy RMS</div>
+                <div className="text-lg font-bold text-text-primary">{biomarkerBaseline.avg_shimmer?.toFixed(2)}%</div>
+                <div className="text-xs text-text-muted">Avg Shimmer</div>
               </div>
             </div>
           </div>

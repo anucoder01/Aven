@@ -17,6 +17,7 @@ import { sessionEngine } from '../services/sessionEngine'
 import { soundscapeEngine } from '../services/soundscapeEngine'
 import { BiomarkerConsentModal } from '../components/therapy/BiomarkerConsentModal'
 import { faceTensionEngine } from '../services/faceTensionEngine'
+import { speak, stopSpeaking } from '../services/ttsEngine'
 
 // DISTORTION_COLORS removed
 
@@ -163,6 +164,7 @@ export default function SessionPage() {
   const [orbState, setOrbState] = useState('idle')
   const [sessionEnded, setSessionEnded] = useState(false)
   const [isSoundscapeActive, setIsSoundscapeActive] = useState(false)
+  const [isVoiceMode, setIsVoiceMode] = useState(true)
   const chatBottomRef = useRef(null)
   const inputRef = useRef(null)
   const recognitionRef = useRef(null)
@@ -178,6 +180,7 @@ export default function SessionPage() {
   useEffect(() => {
     return () => {
       soundscapeEngine.cleanup()
+      stopSpeaking()
     }
   }, [])
 
@@ -251,11 +254,17 @@ export default function SessionPage() {
         }
 
         addMessage({ role: 'ai', text: finalText, characterName: finalName })
+        if (isVoiceMode) {
+          await speak(finalText, { rate: 1.0 })
+        }
         setTimeout(() => setOrbState('idle'), 1500)
       } catch (e) {
         console.warn("LLM greeting failed", e)
         setCharacterTyping(false)
         addMessage({ role: 'ai', text: "Hello.", characterName: scenario.name })
+        if (isVoiceMode) {
+          await speak("Hello.", { rate: 1.0 })
+        }
         setTimeout(() => setOrbState('idle'), 1500)
       }
     }
@@ -379,6 +388,9 @@ export default function SessionPage() {
       }
 
       addMessage({ role: 'ai', text: finalText, characterName: finalName })
+      if (isVoiceMode) {
+        await speak(finalText, { rate: 1.0 })
+      }
       setTimeout(() => setOrbState('idle'), 1500)
 
     } catch (e) {
@@ -386,6 +398,9 @@ export default function SessionPage() {
       setCharacterTyping(false)
       const aiResponse = "I'm not sure what to say to that."
       addMessage({ role: 'ai', text: aiResponse, characterName: scenario.name })
+      if (isVoiceMode) {
+        await speak(aiResponse, { rate: 1.0 })
+      }
       setTimeout(() => setOrbState('idle'), 1500)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -448,18 +463,32 @@ export default function SessionPage() {
         videoRef.current.srcObject = stream
         videoRef.current.play()
 
-        const loop = async () => {
+        let lastProcessTime = 0
+        const loop = async (now) => {
           if (!isRunning) return
           if (videoRef.current && videoRef.current.readyState >= 2) {
-            const result = await faceTensionEngine.predictVideo(videoRef.current, performance.now())
-            if (result) {
-              setFacialTension(result.tensionIndex)
-              // Optionally post to backend /biomarker/facial here at intervals
+            // Limit to ~5 FPS (every 200ms)
+            if (now - lastProcessTime > 200) {
+              lastProcessTime = now
+              const result = await faceTensionEngine.predictVideo(videoRef.current, performance.now())
+              if (result) {
+                setFacialTension(result.tensionIndex)
+                fetch('http://localhost:8000/biomarker/facial', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                    session_id: String(scenarioId),
+                    user_id: 'test_user',
+                    tension_index: result.tensionIndex,
+                    blink_rate: result.blinkRate
+                  })
+                }).catch(e => console.warn("Facial tracking post failed", e))
+              }
             }
           }
           animRef.current = requestAnimationFrame(loop)
         }
-        loop()
+        requestAnimationFrame(loop)
       }).catch(e => {
         console.warn("Camera access denied", e)
       })
@@ -517,6 +546,19 @@ export default function SessionPage() {
           >
             {isSoundscapeActive ? <Volume2 size={12} /> : <VolumeX size={12} />}
             {isSoundscapeActive ? 'Soundscape On' : 'Soundscape Off'}
+          </button>
+          <button
+            onClick={() => {
+              if (isVoiceMode) stopSpeaking()
+              setIsVoiceMode(!isVoiceMode)
+            }}
+            className={`flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg border transition-all ${
+              isVoiceMode 
+                ? 'text-teal-400 border-teal-400/20 bg-teal-400/10' 
+                : 'text-text-muted border-white/[0.04] hover:bg-white/[0.02]'
+            }`}
+          >
+            {isVoiceMode ? 'TTS On' : 'TTS Off'}
           </button>
           <button
             onClick={handleEndSession}
