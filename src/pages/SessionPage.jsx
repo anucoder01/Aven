@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useNavigate, useParams, useLocation } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Mic, MicOff, Send, ChevronLeft, AlertTriangle, Brain, Eye, Zap, Volume2, VolumeX, StopCircle } from 'lucide-react'
+import { Mic, MicOff, Send, ChevronLeft, AlertTriangle, Brain, Eye, Volume2, VolumeX, StopCircle } from 'lucide-react'
 import AvenOrb from '../components/3d/AvenOrb'
 import AuroraBackground from '../components/3d/AuroraBackground'
 import WaveformVisualizer from '../components/chat/WaveformVisualizer'
@@ -9,22 +9,16 @@ import DistortionBadge from '../components/chat/DistortionBadge'
 import { useSessionStore } from '../store/sessionStore'
 import { useCharacterMemoryStore } from '../store/characterMemoryStore'
 import { useUserStore } from '../store/userStore'
+import { useBodyStore } from '../store/bodyStore'
 import { DISTORTION_LABELS } from '../data/scenarios'
 import { characters } from '../data/characterLibrary'
 import { classifyMessage, detectAvoidance } from '../data/mockData'
 import { sessionEngine } from '../services/sessionEngine'
 import { soundscapeEngine } from '../services/soundscapeEngine'
+import { BiomarkerConsentModal } from '../components/therapy/BiomarkerConsentModal'
+import { faceTensionEngine } from '../services/faceTensionEngine'
 
-const DISTORTION_COLORS = {
-  catastrophizing: '#fb7185',
-  mind_reading: '#a78bfa',
-  all_or_nothing: '#fbbf24',
-  personalization: '#2dd4bf',
-  fortune_telling: '#c084fc',
-  should_statements: '#fb923c',
-  emotional_reasoning: '#f472b6',
-  labeling: '#818cf8',
-}
+// DISTORTION_COLORS removed
 
 function ChatBubble({ message }) {
   const isUser = message.role === 'user'
@@ -75,6 +69,10 @@ function ChatBubble({ message }) {
 }
 
 function LiveStatsPanel({ stats }) {
+  const { spikeEvents, getLatestCheckIn } = useBodyStore()
+  const preSession = getLatestCheckIn('pre')
+  const suds = preSession ? preSession.suds : 5
+  const hasSpikes = spikeEvents && spikeEvents.length > 0
   const top = DISTORTION_LABELS.filter(d => (stats[d.key] || 0) > 0).sort((a, b) => (stats[b.key] || 0) - (stats[a.key] || 0))
 
   return (
@@ -113,10 +111,34 @@ function LiveStatsPanel({ stats }) {
       )}
 
       <div className="mt-4 pt-4 border-t border-white/[0.04]">
-        <div className="flex items-center justify-between text-xs text-text-muted">
+        <div className="flex items-center justify-between text-xs text-text-muted mb-2">
           <span className="flex items-center gap-1"><Eye size={10} /> Avoidances</span>
           <span className="text-amber-400 font-semibold">{stats.avoidance_count}</span>
         </div>
+        
+        {/* Combined Distress View */}
+        <div className="space-y-2 mt-4">
+          <h4 className="text-[10px] font-semibold text-text-muted uppercase tracking-widest">Combined Distress</h4>
+          <div className="flex items-center justify-between text-xs">
+            <span className="text-text-secondary">Self-Report (SUDS)</span>
+            <span className="text-text-primary font-bold">{suds}/10</span>
+          </div>
+          <div className="flex items-center justify-between text-xs">
+            <span className="text-text-secondary">Physiological (Tremors)</span>
+            <span className={hasSpikes ? "text-amber-400 font-bold" : "text-teal-400 font-bold"}>
+              {hasSpikes ? "Elevated" : "Calm"}
+            </span>
+          </div>
+          {hasSpikes && suds < 4 && (
+            <div className="text-[10px] text-amber-400/80 bg-amber-400/10 p-2 rounded-lg mt-2">
+              <AlertTriangle size={10} className="inline mr-1" />
+              Mismatch: You reported low distress, but your body shows tension.
+            </div>
+          )}
+        </div>
+        <p className="text-[9px] text-text-muted mt-3 opacity-60">
+          *Biomarkers are physiological proxies, not clinical diagnoses.
+        </p>
       </div>
     </div>
   )
@@ -133,9 +155,9 @@ export default function SessionPage() {
   const scenario = characters.find(s => s.id === scenarioId) || customScenarios?.find(s => s.id === scenarioId) || characters[0]
   const level = scenario.levels.find(l => l.level === parseInt(levelNum)) || scenario.levels[0]
 
-  const { messages, liveStats, isCharacterTyping, voiceMode, isRecording,
+  const { messages, liveStats, isCharacterTyping, isRecording,
     startSession, addMessage, addDistortions, addAvoidance,
-    setCharacterTyping, setVoiceMode, setRecording } = useSessionStore()
+    setCharacterTyping, setRecording } = useSessionStore()
 
   const [inputText, setInputText] = useState('')
   const [orbState, setOrbState] = useState('idle')
@@ -144,6 +166,11 @@ export default function SessionPage() {
   const chatBottomRef = useRef(null)
   const inputRef = useRef(null)
   const recognitionRef = useRef(null)
+  const videoRef = useRef(null)
+  const animRef = useRef(null)
+
+  const [consentState, setConsentState] = useState(null)
+  const [facialTension, setFacialTension] = useState(null)
 
   const { buildMemoryContext } = useCharacterMemoryStore()
   const memoryContextRef = useRef('')
@@ -233,6 +260,7 @@ export default function SessionPage() {
       }
     }
     setTimeout(fetchGreeting, 800)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   // Auto-scroll
@@ -271,7 +299,7 @@ export default function SessionPage() {
         data.avoidance_signals.forEach(a => addAvoidance(a))
       }
     })
-    .catch(e => {
+    .catch(() => {
       console.warn("Classifier API failed, falling back to mock")
       const fallbackDistortions = classifyMessage(userText)
       const fallbackAvoidance = detectAvoidance(userText)
@@ -360,6 +388,7 @@ export default function SessionPage() {
       addMessage({ role: 'ai', text: aiResponse, characterName: scenario.name })
       setTimeout(() => setOrbState('idle'), 1500)
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sessionEnded])
 
   // Voice recognition
@@ -411,8 +440,52 @@ export default function SessionPage() {
 
   const difficultyColor = ['', '#2dd4bf', '#a78bfa', '#fbbf24', '#fb923c', '#fb7185'][level.level] || '#2dd4bf'
 
+  useEffect(() => {
+    if (consentState === 'accepted') {
+      let isRunning = true
+      navigator.mediaDevices.getUserMedia({ video: true }).then(stream => {
+        if (!videoRef.current) return
+        videoRef.current.srcObject = stream
+        videoRef.current.play()
+
+        const loop = async () => {
+          if (!isRunning) return
+          if (videoRef.current && videoRef.current.readyState >= 2) {
+            const result = await faceTensionEngine.predictVideo(videoRef.current, performance.now())
+            if (result) {
+              setFacialTension(result.tensionIndex)
+              // Optionally post to backend /biomarker/facial here at intervals
+            }
+          }
+          animRef.current = requestAnimationFrame(loop)
+        }
+        loop()
+      }).catch(e => {
+        console.warn("Camera access denied", e)
+      })
+
+      return () => {
+        isRunning = false
+        cancelAnimationFrame(animRef.current)
+        if (videoRef.current && videoRef.current.srcObject) {
+          videoRef.current.srcObject.getTracks().forEach(t => t.stop())
+        }
+      }
+    }
+  }, [consentState])
+
   return (
     <div className="h-screen flex flex-col relative overflow-hidden" style={{ background: '#07071a' }}>
+      {consentState === null && (
+        <BiomarkerConsentModal
+          onAccept={() => setConsentState('accepted')}
+          onDecline={() => setConsentState('declined')}
+        />
+      )}
+      
+      {/* Hidden video for mediapipe */}
+      <video ref={videoRef} className="hidden" playsInline muted />
+      
       <AuroraBackground />
 
       {/* Top bar */}
@@ -502,7 +575,7 @@ export default function SessionPage() {
 
             {/* Voice waveform */}
             <AnimatePresence>
-              {(isRecording || voiceMode) && (
+              {(isRecording) && (
                 <motion.div
                   initial={{ height: 0, opacity: 0 }}
                   animate={{ height: 64, opacity: 1 }}

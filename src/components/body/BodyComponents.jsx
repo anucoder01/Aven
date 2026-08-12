@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
-import { Wind, Activity, Mic, Brain } from 'lucide-react'
+import { motion } from 'framer-motion'
+import { Mic } from 'lucide-react'
 import { useBodyStore } from '../../store/bodyStore'
 import AvenOrb from '../3d/AvenOrb'
 
@@ -85,7 +85,7 @@ export function BreathingHub() {
 
   useEffect(() => {
     if (!active || !mode) return
-    const phase = mode.phases[phaseIndex]
+    // const phase removed
 
     timerRef.current = setInterval(() => {
       setSecondsLeft(prev => {
@@ -109,6 +109,7 @@ export function BreathingHub() {
     }, 1000)
 
     const label = mode.phases[phaseIndex].label.toLowerCase()
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setOrbState(label.includes('exhale') ? 'idle' : label.includes('hold') ? 'distortion' : 'listening')
 
     return () => clearInterval(timerRef.current)
@@ -206,7 +207,7 @@ const BODY_DIMENSIONS = [
 ]
 
 export function BodyCheckIn() {
-  const { addCheckIn, getLatestCheckIn, checkIns } = useBodyStore()
+  const { addCheckIn, getLatestCheckIn } = useBodyStore()
   const [phase, setPhase] = useState('pre')
   const [values, setValues] = useState({
     heartRate: 4, muscleTension: 4, breathingEase: 4,
@@ -379,6 +380,9 @@ export function VocalBiomarkerPanel() {
               </div>
             </div>
           )}
+          <p className="text-[10px] text-text-muted opacity-60 mt-4 text-center">
+            *Note: Vocal biomarkers are physiological proxy signals correlated with stress, not a clinical diagnosis. Do not use this to self-diagnose an anxiety disorder.
+          </p>
         </div>
       )}
     </div>
