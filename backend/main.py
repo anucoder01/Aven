@@ -8,13 +8,16 @@ from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 import uvicorn
 
-from routers import classifier, llm, scenario, therapist
+from routers import classifier, llm, scenario, therapist, biomarker
 from config import settings
+from database import engine, Base
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Startup placeholder
+    # Initialize Database
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
     yield
     # Shutdown placeholder
 
@@ -38,6 +41,7 @@ app.include_router(classifier.router, prefix="/classify", tags=["Classifier"])
 app.include_router(llm.router, prefix="/llm", tags=["LLM"])
 app.include_router(scenario.router, prefix="/scenario", tags=["Scenario"])
 app.include_router(therapist.router, prefix="/therapist", tags=["Therapist"])
+app.include_router(biomarker.router, prefix="/biomarker", tags=["Biomarker"])
 
 
 @app.get("/health")
