@@ -34,18 +34,7 @@ export const useBodyStore = create((set, get) => ({
   biomarkerBaseline: null, // established after 3 sessions
   biomarkerHistory: [], // { sessionId, avgPitch, pitchSD, avgEnergy, speechRate, timestamp }
 
-  updateBaseline: (data) => set(state => {
-    const history = [...state.biomarkerHistory, { ...data, timestamp: Date.now() }]
-    if (history.length < 3) return { biomarkerHistory: history }
-    // Compute rolling baseline from all sessions
-    const avgPitch = history.reduce((s, h) => s + h.avgPitch, 0) / history.length
-    const avgEnergy = history.reduce((s, h) => s + h.avgEnergy, 0) / history.length
-    const avgRate = history.reduce((s, h) => s + h.speechRate, 0) / history.length
-    return {
-      biomarkerHistory: history,
-      biomarkerBaseline: { avgPitch, avgEnergy, avgRate, establishedAt: Date.now(), sampleCount: history.length },
-    }
-  }),
+  updateBaseline: (data) => set({ biomarkerBaseline: data }),
 
   // ─── Spike Events ───
   spikeEvents: [],

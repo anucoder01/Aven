@@ -12,67 +12,56 @@ export function useVoiceBiomarkers(active, sessionId) {
       const mediaRecorder = new MediaRecorder(stream)
       mediaRecorderRef.current = mediaRecorder
 
-      mediaRecorder.ondataavailable = (e) => {
+      mediaRecorder.ondataavailable = async (e) => {
         if (e.data.size > 0) {
-          chunksRef.current.push(e.data)
+          // Post chunk to backend
+          const blob = new Blob([e.data], { type: 'audio/webm' })
+          const formData = new FormData()
+          formData.append('audio', blob)
+          formData.append('session_id', sessionId || 'test-session')
+          formData.append('user_id', 'test_user')
+
+          try {
+            const res = await fetch('http://localhost:8000/biomarker/voice', {
+              method: 'POST',
+              body: formData,
+            })
+            
+            if (res.ok) {
+              const result = await res.json()
+              const data = result // Depending on backend response structure, it might be the top-level JSON
+              
+              // Check for spikes
+              if (biomarkerBaseline) {
+                const pitchDev = (data.pitch_hz - biomarkerBaseline.avg_pitch) / biomarkerBaseline.avg_pitch
+                const jitterDev = data.jitter_pct - biomarkerBaseline.avg_jitter
+
+                if (pitchDev > 0.15 || jitterDev > 1.5) { // Arbitrary spike thresholds
+                  addSpike({
+                    type: 'vocal',
+                    pitchDelta: pitchDev * 100,
+                    jitterDelta: jitterDev,
+                    rawPitch: data.pitch_hz,
+                  })
+                }
+              } else {
+                // Not established yet, do nothing.
+              }
+            }
+          } catch (err) {
+            console.warn("Voice biomarker analysis failed", err)
+          }
         }
       }
 
-      mediaRecorder.onstop = async () => {
-        const blob = new Blob(chunksRef.current, { type: 'audio/webm' })
-        chunksRef.current = []
-
-        // Post to backend
-        const formData = new FormData()
-        formData.append('audio', blob)
-        formData.append('session_id', sessionId || 'test-session')
-
-        try {
-          const res = await fetch('http://localhost:8000/biomarker/voice', {
-            method: 'POST',
-            body: formData,
-          })
-          
-          if (res.ok) {
-            const result = await res.json()
-            const data = result.data
-            
-            // Check for spikes
-            if (biomarkerBaseline) {
-              const pitchDev = (data.pitch_hz - biomarkerBaseline.avgPitch) / biomarkerBaseline.avgPitch
-              const jitterDev = data.jitter_pct - biomarkerBaseline.avgJitter
-
-              if (pitchDev > 0.15 || jitterDev > 1.5) { // Arbitrary spike thresholds
-                addSpike({
-                  type: 'vocal',
-                  pitchDelta: pitchDev * 100,
-                  jitterDelta: jitterDev,
-                  rawPitch: data.pitch_hz,
-                })
-              }
-            } else {
-              // Mock establishing baseline for testing without DB persistence of past sessions
-              // Normally, we fetch GET /biomarker/voice/baseline/USER_ID
-            }
-          }
-        } catch (e) {
-          console.warn("Voice biomarker analysis failed", e)
-        }
+      mediaRecorder.onstop = () => {
+        // Nothing special on stop, chunks were handled in ondataavailable
       }
 
       // Record in 5-second chunks
       mediaRecorder.start(5000)
 
-      // Stop and restart every 5 seconds to get chunks
-      const interval = setInterval(() => {
-        if (mediaRecorder.state === 'recording') {
-          mediaRecorder.stop()
-          mediaRecorder.start(5000)
-        }
-      }, 5000)
-
       return () => {
-        clearInterval(interval)
         if (mediaRecorder.state === 'recording') {
           mediaRecorder.stop()
         }
@@ -83,6 +72,28 @@ export function useVoiceBiomarkers(active, sessionId) {
       return () => {}
     }
   }, [sessionId, biomarkerBaseline, addSpike])
+
+  useEffect(() => {
+    const fetchBaseline = async () => {
+      try {
+        const res = await fetch(`http://localhost:8000/biomarker/voice/baseline/test_user`);
+        if (res.ok) {
+          const data = await res.json();
+          if (data.established) {
+            updateBaseline({
+              avg_pitch: data.avg_pitch,
+              avg_jitter: data.avg_jitter,
+              avg_shimmer: data.avg_shimmer,
+              sampleCount: data.sample_count
+            });
+          }
+        }
+      } catch (err) {
+        console.warn("Could not fetch baseline", err);
+      }
+    };
+    fetchBaseline();
+  }, [updateBaseline]);
 
   useEffect(() => {
     let cleanup = () => {}
