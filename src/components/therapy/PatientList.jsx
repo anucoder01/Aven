@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Users, User, Clock, Activity, Target } from 'lucide-react'
+import { User, Clock, Activity, Target } from 'lucide-react'
 
 export function PatientList() {
   const [patients, setPatients] = useState([])

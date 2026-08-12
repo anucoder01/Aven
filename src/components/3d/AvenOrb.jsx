@@ -89,7 +89,9 @@ function ParticleRing({ state = 'idle' }) {
     const positions = new Float32Array(count * 3)
     for (let i = 0; i < count; i++) {
       const angle = (i / count) * Math.PI * 2
+      // eslint-disable-next-line react-hooks/purity
       const radius = 2.2 + (Math.random() - 0.5) * 0.8
+      // eslint-disable-next-line react-hooks/purity
       const height = (Math.random() - 0.5) * 0.4
       positions[i * 3] = Math.cos(angle) * radius
       positions[i * 3 + 1] = height

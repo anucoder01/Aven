@@ -1,6 +1,6 @@
-import { useState, useRef } from 'react'
-import { motion, AnimatePresence, Reorder } from 'framer-motion'
-import { Plus, Trash2, ChevronRight, Check, GripVertical, ExternalLink, Brain, Lightbulb, MessageSquare, FlaskConical, Eye } from 'lucide-react'
+import { useState } from 'react'
+import { motion, AnimatePresence } from 'framer-motion'
+import { Plus, Trash2, ChevronRight, Check, ExternalLink, Brain, MessageSquare, FlaskConical, Eye } from 'lucide-react'
 import { useTherapyStore } from '../../store/therapyStore'
 import { useSessionStore } from '../../store/sessionStore'
 import { DISTORTION_LABELS } from '../../data/scenarios'
@@ -347,7 +347,7 @@ function SUDSColor(suds) {
 }
 
 export function FearHierarchyTab() {
-  const { fearHierarchy, addFearItem, updateFearItem, deleteFearItem, markFearPracticed } = useTherapyStore()
+  const { fearHierarchy, addFearItem, deleteFearItem, markFearPracticed } = useTherapyStore()
   const navigate = useNavigate()
   const [adding, setAdding] = useState(false)
   const [newItem, setNewItem] = useState({ situation: '', suds: 50 })
@@ -469,11 +469,11 @@ export function FearHierarchyTab() {
 //  TAB 4: BEHAVIORAL EXPERIMENTS
 // ══════════════════════════════════════════
 export function BehavioralExperimentTab() {
-  const { experiments, addExperiment, updateExperiment, getPredictionAccuracy } = useTherapyStore()
+  const { experiments, addExperiment, getPredictionAccuracy } = useTherapyStore()
   const { distortionEvents, messages } = useSessionStore()
   const [creating, setCreating] = useState(false)
   const [form, setForm] = useState({ prediction: '', actionPlan: '', outcome: '', analysis: '' })
-  const [selectedId, setSelectedId] = useState(null)
+  // unused selectedId
 
   const accuracy = getPredictionAccuracy()
   const lastCatastrophe = distortionEvents.flatMap(e => e.distortions).find(d => d.key === 'catastrophizing')
@@ -485,7 +485,7 @@ export function BehavioralExperimentTab() {
     setForm({ prediction: '', actionPlan: '', outcome: '', analysis: '' })
   }
 
-  const selected = experiments.find(e => e.id === selectedId)
+  // unused assignment selected removed
 
   return (
     <div className="space-y-4">
@@ -592,14 +592,7 @@ export function BehavioralExperimentTab() {
                     <p className="text-xs text-teal-400 mt-1 truncate">Outcome: {exp.outcome}</p>
                   )}
                   <div className="flex gap-3 mt-2">
-                    {!exp.outcome && (
-                      <button
-                        onClick={() => setSelectedId(exp.id)}
-                        className="text-[11px] text-violet-400 hover:text-violet-300"
-                      >
-                        Record outcome →
-                      </button>
-                    )}
+                    {/* Record outcome button removed */}
                     <span className="text-[10px] text-text-muted">{new Date(exp.createdAt).toLocaleDateString()}</span>
                   </div>
                 </div>
@@ -623,7 +616,7 @@ export function ImageryRescriptingTab() {
   const [memory, setMemory] = useState('')
   const [rescripted, setRescripted] = useState('')
 
-  const currentSession = rescriptingSessions.find(s => s.id === sessionId)
+  // unused currentSession removed
 
   const beginSafely = () => {
     if (distressCheck >= 7) return

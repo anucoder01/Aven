@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Brain, Dumbbell, HeartPulse, BarChart3, Lightbulb, Shield, ChevronLeft, ChevronRight, Mic, Menu, X, Users } from 'lucide-react'
+import { Brain, Dumbbell, HeartPulse, BarChart3, Lightbulb, Shield, ChevronLeft, ChevronRight, Menu, Users } from 'lucide-react'
 
 const NAV_ITEMS = [
   { id: 'practice',  label: 'Practice',       icon: Dumbbell,   path: '/',          description: '25 scenarios · 5 levels each' },

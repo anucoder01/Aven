@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+// React unused
 
 // CSS-based aurora — no Three.js overhead on landing page
 export default function AuroraBackground() {

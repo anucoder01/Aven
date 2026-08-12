@@ -270,7 +270,7 @@ export function ClinicalTracker() {
         <div className="glass rounded-xl p-4">
           <h3 className="text-xs text-text-muted uppercase tracking-widest mb-3">LSAS Trend</h3>
           <div className="space-y-2">
-            {assessments.lsas.map((a, i) => {
+            {assessments.lsas.map((a) => {
               const sev = lsasSeverity(a.score)
               return (
                 <div key={a.id} className="flex items-center gap-3">

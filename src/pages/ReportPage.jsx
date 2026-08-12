@@ -1,12 +1,11 @@
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
-import { ChevronLeft, Download, RefreshCw, ArrowRight, Brain, Target, Lightbulb, AlertTriangle, TrendingUp, CheckCircle, FileText, Plus } from 'lucide-react'
+import { ChevronLeft, Download, RefreshCw, ArrowRight, Brain, Target, Lightbulb, AlertTriangle, TrendingUp, FileText, Plus } from 'lucide-react'
 import AuroraBackground from '../components/3d/AuroraBackground'
 import { useSessionStore } from '../store/sessionStore'
 import { useTherapyStore } from '../store/therapyStore'
 import { useUserStore } from '../store/userStore'
-import { MOCK_CBT_REPORT } from '../data/mockData'
 import { DISTORTION_LABELS } from '../data/scenarios'
 import { Star } from 'lucide-react'
 
@@ -190,27 +189,14 @@ function DistortionCard({ distortion, index }) {
 
 export default function ReportPage() {
   const navigate = useNavigate()
-  const { messages, liveStats, distortionEvents } = useSessionStore()
+  const { messages, distortionEvents } = useSessionStore()
   const { addReport } = useUserStore()
-  const { addThoughtRecord } = useTherapyStore()
   const [report, setReport] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const reportSavedRef = useRef(false)
 
-  const handleExportToThoughtRecord = (quote, d) => {
-    addThoughtRecord({
-      situation: 'Session Simulation',
-      emotion: 'Anxious',
-      automaticThought: quote.text,
-      distortion: d.label,
-      evidenceFor: '',
-      evidenceAgainst: '',
-      alternativeThought: quote.reframe,
-      date: new Date().toISOString()
-    })
-    // Could show a toast here
-  }
+  // removed handleExportToThoughtRecord
 
   useEffect(() => {
     const fetchReport = async () => {
@@ -248,6 +234,7 @@ export default function ReportPage() {
     }
     
     fetchReport()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   if (loading) {

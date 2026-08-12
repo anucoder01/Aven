@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Brain, Lightbulb, BarChart3, FlaskConical, Eye, ChevronRight } from 'lucide-react'
+import { Brain, Lightbulb, BarChart3, FlaskConical, Eye } from 'lucide-react'
 import AuroraBackground from '../components/3d/AuroraBackground'
 import { ThoughtRecordTab, SocraticCoachTab, FearHierarchyTab, BehavioralExperimentTab, ImageryRescriptingTab } from '../components/therapy/TherapyTools'
 

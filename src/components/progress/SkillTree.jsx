@@ -1,4 +1,3 @@
-import React from 'react'
 import { motion } from 'framer-motion'
 import { Shield, Brain, Target, Compass, Star, Lock } from 'lucide-react'
 import { useUserStore } from '../../store/userStore'
