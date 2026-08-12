@@ -14,6 +14,8 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+import httpx
+
 try:
     from openai import AsyncOpenAI
     HAS_OPENAI = True
@@ -28,8 +30,26 @@ except ImportError:
 
 router = APIRouter()
 
-# LLM client (lazy)
+OLLAMA_BASE_URL = os.environ.get("OLLAMA_BASE_URL", "http://localhost:11434")
+OLLAMA_MODEL = os.environ.get("OLLAMA_MODEL", "llama3.1:8b")
+
+def _ollama_is_running(timeout_seconds: float = 1.0) -> bool:
+    try:
+        resp = httpx.get(f"{OLLAMA_BASE_URL}/api/tags", timeout=timeout_seconds)
+        return resp.status_code == 200
+    except (httpx.ConnectError, httpx.TimeoutException):
+        return False
+
 def get_llm_client():
+    if HAS_OPENAI and _ollama_is_running():
+        try:
+            return AsyncOpenAI(
+                api_key="ollama-local-no-key-needed",
+                base_url=f"{OLLAMA_BASE_URL}/v1",
+            ), "ollama"
+        except Exception:
+            pass
+
     if os.environ.get("GROQ_API_KEY") and HAS_OPENAI:
         try:
             return AsyncOpenAI(
@@ -49,7 +69,7 @@ def get_llm_client():
             return AsyncOpenAI(api_key=os.environ.get("OPENAI_API_KEY")), "openai"
         except Exception:
             pass
-    
+
     return None, None
 
 
@@ -153,15 +173,14 @@ async def character_response(req: CharacterRequest):
         delay = 1.0 if req.difficulty_level <= 2 else (3.0 if req.difficulty_level == 3 else 4.5)
         await asyncio.sleep(delay)
 
-        if provider in ["openai", "groq"]:
+        if provider in ["openai", "groq", "ollama"]:
             messages = [{"role": "system", "content": req.system_prompt}]
             for m in req.messages:
                 # Map frontend 'ai' role to standard 'assistant' role
                 role = "assistant" if m.role == "ai" else m.role
                 messages.append({"role": role, "content": m.content})
             
-            # Use llama-3.3 for groq, gpt-4o for openai
-            model_name = "llama-3.3-70b-versatile" if provider == "groq" else "gpt-4o"
+            model_name = OLLAMA_MODEL if provider == "ollama" else ("llama-3.3-70b-versatile" if provider == "groq" else "gpt-4o")
             
             try:
                 stream = await client.chat.completions.create(
@@ -224,12 +243,12 @@ async def generate_report(req: ReportRequest):
     ])
     distortion_summary = json.dumps(req.distortion_events, indent=2)
 
-    # Note: we are currently using OpenAI or Groq for JSON report generation
-    if not client or provider not in ["openai", "groq"]:
+    # Note: we are currently using OpenAI, Groq, or Ollama for JSON report generation
+    if not client or provider not in ["openai", "groq", "ollama"]:
         return await generate_mock_report(req.transcript, req.distortion_events)
 
     try:
-        model_name = "llama-3.3-70b-versatile" if provider == "groq" else "gpt-4o"
+        model_name = OLLAMA_MODEL if provider == "ollama" else ("llama-3.3-70b-versatile" if provider == "groq" else "gpt-4o")
         response = await client.chat.completions.create(
             model=model_name,
             messages=[
@@ -252,7 +271,7 @@ async def generate_scenario(req: GenerateScenarioRequest):
     client, provider = get_llm_client()
     
     # Fallback if no LLM configured
-    if not client or provider not in ["openai", "groq"]:
+    if not client or provider not in ["openai", "groq", "ollama"]:
         return {
             "id": f"custom_{int(time.time())}",
             "name": "Custom AI Character",
@@ -305,7 +324,7 @@ async def generate_scenario(req: GenerateScenarioRequest):
     """
 
     try:
-        model_name = "llama-3.3-70b-versatile" if provider == "groq" else "gpt-4o"
+        model_name = OLLAMA_MODEL if provider == "ollama" else ("llama-3.3-70b-versatile" if provider == "groq" else "gpt-4o")
         response = await client.chat.completions.create(
             model=model_name,
             messages=[{"role": "system", "content": prompt_instructions}],
