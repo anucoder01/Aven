@@ -53,8 +53,13 @@ Aven prioritizes user safety above all else.
 
 ## 🛠 Tech Stack
 - **Frontend:** React + Vite, TailwindCSS, Framer Motion
-- **Backend:** FastAPI, Python
-- **Machine Learning:** PyTorch, HuggingFace Transformers (RoBERTa), OpenAI / ElevenLabs APIs
+- **Backend:** FastAPI, Python, PostgreSQL, SQLAlchemy
+- **Machine Learning & Signal Processing:**
+  - **RoBERTa (Transformer):** Fine-tuned for multi-label cognitive distortion classification.
+  - **MediaPipe Face Landmarker (CNNs):** On-device WebAssembly BlazeFace & Mesh model for extracting 52 facial blendshapes (Tension Index).
+  - **WebRTC VAD (Gaussian Mixture Models):** Voice Activity Detection for speech rate estimation.
+  - **Parselmouth/Praat (DSP):** Acoustic signal processing for extracting physiological voice tremors (F0 Pitch, Jitter, Shimmer).
+  - **Generative LLMs:** OpenAI / Anthropic APIs for dynamic CBT roleplay generation.
 
 ## 🚀 How to Run the Project
 
