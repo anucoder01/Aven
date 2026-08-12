@@ -9,9 +9,12 @@ openai>=1.23.0
 anthropic>=0.25.0
 httpx>=0.27.0
 
-# ML
+# ML & Audio
 torch>=2.2.0
 transformers>=4.39.0
 scikit-learn>=1.4.0
 numpy>=1.26.0
 tqdm>=4.66.0
+praat-parselmouth>=0.4.3
+webrtcvad>=2.0.10
+python-multipart>=0.0.9
