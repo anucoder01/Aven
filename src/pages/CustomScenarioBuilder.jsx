@@ -83,7 +83,7 @@ export default function CustomScenarioBuilder() {
         </div>
 
         <motion.div 
-          className="glass border border-white/[0.04] p-6 rounded-2xl"
+          className="glass border border-white/[0.04] p-6 rounded-2xl mb-8"
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
         >
@@ -182,6 +182,35 @@ export default function CustomScenarioBuilder() {
             </button>
           </form>
         </motion.div>
+
+        {customScenarios && customScenarios.length > 0 && (
+          <motion.div 
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="mt-12"
+          >
+            <h2 className="text-xl font-display font-bold text-text-primary mb-4">Your Custom Scenarios</h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {customScenarios.map((scenario) => (
+                <div key={scenario.id} className="glass p-5 rounded-xl border border-white/[0.04] flex flex-col justify-between">
+                  <div>
+                    <h3 className="text-base font-bold text-text-primary mb-1">{scenario.name}</h3>
+                    <p className="text-xs text-text-secondary mb-3">{scenario.scenario}</p>
+                    <div className="flex items-center gap-2 text-[10px] text-text-muted">
+                      <span className="px-2 py-1 bg-white/[0.05] rounded-md">{scenario.identity}</span>
+                    </div>
+                  </div>
+                  <button 
+                    onClick={() => navigate(`/session/${scenario.id}/3`)}
+                    className="mt-4 w-full py-2 bg-white/[0.05] hover:bg-white/[0.1] text-xs font-medium rounded-lg transition-colors"
+                  >
+                    Play Again
+                  </button>
+                </div>
+              ))}
+            </div>
+          </motion.div>
+        )}
       </div>
     </div>
   )
