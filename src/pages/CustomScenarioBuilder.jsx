@@ -1,9 +1,14 @@
 import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { PlusCircle, User, Settings, Flag, BrainCircuit } from 'lucide-react'
 import AuroraBackground from '../components/3d/AuroraBackground'
+import { useUserStore } from '../store/userStore'
 
 export default function CustomScenarioBuilder() {
+  const navigate = useNavigate()
+  const { addCustomScenario } = useUserStore()
+
   const [formData, setFormData] = useState({
     characterName: '',
     relationship: '',
@@ -27,8 +32,31 @@ export default function CustomScenarioBuilder() {
       })
       if (res.ok) {
         setSuccess(true)
-        setTimeout(() => setSuccess(false), 3000)
-        setFormData({ characterName: '', relationship: '', setting: '', goal: '', difficulty: 1 })
+        const newScenario = {
+          id: `custom_${Date.now()}`,
+          name: formData.characterName,
+          scenario: formData.goal,
+          domain: 'custom',
+          icon: '✨',
+          identity: formData.relationship,
+          vocab: formData.setting,
+          levels: [
+            { level: 1, label: "Cooperative" },
+            { level: 2, label: "Neutral" },
+            { level: 3, label: "Dismissive" },
+            { level: 4, label: "Difficult" },
+            { level: 5, label: "Hostile" }
+          ],
+          responseMap: {},
+          systemPrompt: `You are ${formData.characterName}. RELATIONSHIP: ${formData.relationship}. CONTEXT: ${formData.setting}. USER GOAL: ${formData.goal}. RULES: Respond to what they specifically said. 1-3 sentences. DIFFICULTY: {level} — {level_desc}`,
+          isGroup: false
+        }
+        addCustomScenario(newScenario)
+        
+        setTimeout(() => {
+          setSuccess(false)
+          navigate(`/session/${newScenario.id}/${formData.difficulty}`)
+        }, 1000)
       }
     } catch (err) {
       console.error(err)
