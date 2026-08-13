@@ -25,39 +25,42 @@ export default function CustomScenarioBuilder() {
     setSaving(true)
     
     try {
-      const res = await fetch('http://localhost:8000/scenario/create', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData)
-      })
-      if (res.ok) {
-        setSuccess(true)
-        const newScenario = {
-          id: `custom_${Date.now()}`,
-          name: formData.characterName,
-          scenario: formData.goal,
-          domain: 'custom',
-          icon: '✨',
-          identity: formData.relationship,
-          vocab: formData.setting,
-          levels: [
-            { level: 1, label: "Cooperative" },
-            { level: 2, label: "Neutral" },
-            { level: 3, label: "Dismissive" },
-            { level: 4, label: "Difficult" },
-            { level: 5, label: "Hostile" }
-          ],
-          responseMap: {},
-          systemPrompt: `You are ${formData.characterName}. RELATIONSHIP: ${formData.relationship}. CONTEXT: ${formData.setting}. USER GOAL: ${formData.goal}. RULES: Respond to what they specifically said. 1-3 sentences. DIFFICULTY: {level} — {level_desc}`,
-          isGroup: false
-        }
-        addCustomScenario(newScenario)
-        
-        setTimeout(() => {
-          setSuccess(false)
-          navigate(`/session/${newScenario.id}/${formData.difficulty}`)
-        }, 1000)
+      try {
+        await fetch('http://localhost:8000/scenario/create', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(formData)
+        })
+      } catch (backendErr) {
+        console.warn("Backend not reachable, creating scenario locally.", backendErr)
       }
+
+      setSuccess(true)
+      const newScenario = {
+        id: `custom_${Date.now()}`,
+        name: formData.characterName,
+        scenario: formData.goal,
+        domain: 'custom',
+        icon: '✨',
+        identity: formData.relationship,
+        vocab: formData.setting,
+        levels: [
+          { level: 1, label: "Cooperative" },
+          { level: 2, label: "Neutral" },
+          { level: 3, label: "Dismissive" },
+          { level: 4, label: "Difficult" },
+          { level: 5, label: "Hostile" }
+        ],
+        responseMap: {},
+        systemPrompt: `You are ${formData.characterName}. RELATIONSHIP: ${formData.relationship}. CONTEXT: ${formData.setting}. USER GOAL: ${formData.goal}. RULES: Respond to what they specifically said. 1-3 sentences. DIFFICULTY: {level} — {level_desc}`,
+        isGroup: false
+      }
+      addCustomScenario(newScenario)
+      
+      setTimeout(() => {
+        setSuccess(false)
+        navigate(`/session/${newScenario.id}/${formData.difficulty}`)
+      }, 1000)
     } catch (err) {
       console.error(err)
     } finally {
