@@ -1,4 +1,5 @@
 import { characters } from '../data/characterLibrary';
+import { useUserStore } from '../store/userStore';
 
 export interface Message {
   role: string;
@@ -45,7 +46,10 @@ function computeCosineSimilarity(strA: string, strB: string): number {
 
 export const sessionEngine = {
   getResponseMapGuidance(characterId: string, userMessage: string): string | null {
-    const character = characters.find(c => c.id === characterId);
+    let character = characters.find(c => c.id === characterId);
+    if (!character) {
+      character = useUserStore.getState().customScenarios?.find(c => c.id === characterId);
+    }
     if (!character || !character.responseMap) return null;
 
     const lowerMessage = userMessage.toLowerCase();
@@ -71,7 +75,10 @@ export const sessionEngine = {
     userMessage: string,
     isReversal: boolean = false
   ): string {
-    const character = characters.find(c => c.id === characterId);
+    let character = characters.find(c => c.id === characterId);
+    if (!character) {
+      character = useUserStore.getState().customScenarios?.find(c => c.id === characterId);
+    }
     if (!character) throw new Error(`Character ${characterId} not found`);
 
     const levelObj = character.levels.find(l => l.level === difficultyLevel) || character.levels[0];
