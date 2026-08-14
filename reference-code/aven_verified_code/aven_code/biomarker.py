@@ -106,6 +106,23 @@ SPIKE_PITCH_DEVIATION_HZ = 25.0  # flag if pitch deviates > 25Hz from baseline
 MIN_SESSIONS_FOR_BASELINE = 3
 
 
+import subprocess
+
+def _convert_to_wav(input_path: str) -> str:
+    wav_path = input_path + "_converted.wav"
+    try:
+        subprocess.run(
+            ["ffmpeg", "-y", "-i", input_path, "-ar", "16000", "-ac", "1", wav_path],
+            check=True, capture_output=True, timeout=15
+        )
+    except FileNotFoundError:
+        raise ValueError("ffmpeg is missing from the system path.")
+    except subprocess.CalledProcessError as e:
+        raise ValueError(f"ffmpeg conversion failed: {e.stderr.decode('utf-8')}")
+    except subprocess.TimeoutExpired:
+        raise ValueError("ffmpeg conversion timed out.")
+    return wav_path
+
 @router.post("/voice", response_model=VoiceBiomarkerResponse)
 async def analyze_voice_chunk(
     audio: UploadFile = File(...),
@@ -117,20 +134,25 @@ async def analyze_voice_chunk(
     biomarkers, compares against the user's rolling baseline, and flags
     a "spike" if this chunk deviates significantly.
     """
-    suffix = os.path.splitext(audio.filename or "chunk.wav")[1] or ".wav"
+    suffix = os.path.splitext(audio.filename or "chunk.webm")[1] or ".webm"
     with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as tmp:
         content = await audio.read()
         tmp.write(content)
         tmp_path = tmp.name
 
+    converted_wav_path = None
     try:
-        result = extract_voice_biomarkers(tmp_path)
+        converted_wav_path = _convert_to_wav(tmp_path)
+        result = extract_voice_biomarkers(converted_wav_path)
     except ValueError as e:
         raise HTTPException(status_code=422, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Analysis failed: {e}")
     finally:
-        os.unlink(tmp_path)
+        if os.path.exists(tmp_path):
+            os.unlink(tmp_path)
+        if converted_wav_path and os.path.exists(converted_wav_path):
+            os.unlink(converted_wav_path)
 
     _SESSION_SAMPLES.setdefault(session_id, []).append({
         **result, "timestamp": datetime.utcnow().isoformat()

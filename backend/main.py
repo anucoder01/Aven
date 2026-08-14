@@ -13,8 +13,17 @@ from config import settings
 from database import engine, Base
 
 
+import subprocess
+import logging
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    # Check for ffmpeg
+    try:
+        subprocess.run(["ffmpeg", "-version"], check=True, capture_output=True)
+    except (FileNotFoundError, subprocess.CalledProcessError):
+        logging.warning("WARNING: ffmpeg not found in PATH. Voice biomarker extraction will fail!")
+
     # Initialize Database
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)

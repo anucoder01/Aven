@@ -17,14 +17,14 @@ from datetime import datetime
 from typing import Optional
 
 from fastapi import APIRouter, UploadFile, File, Form, HTTPException, Depends
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
 from pydantic import BaseModel
 import parselmouth
-from parselmouth.praat import call
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.future import select
-from sqlalchemy import func
+
 from database import get_db
-from models import VoiceBiomarkerSample, BiomarkerBaseline, User, Session, FacialTensionSample
+from models import VoiceBiomarkerSample, BiomarkerBaseline, Session, User
+from parselmouth.praat import call
 
 router = APIRouter()
 
@@ -78,7 +78,11 @@ def extract_voice_biomarkers(wav_path: str) -> dict:
     }
 
 
-# Removed _SESSION_SAMPLES
+# In-memory store removed: Now using PostgreSQL DB queries
+# Replace this dict with real SQLAlchemy queries against
+# voice_biomarker_samples / biomarker_baselines once the DB migration exists
+# -- structure is kept identical so the swap is a drop-in replacement.
+# ---------------------------------------------------------------------------
 
 
 class VoiceBiomarkerResponse(BaseModel):
@@ -100,21 +104,27 @@ class BaselineResponse(BaseModel):
     sample_count: int = 0
 
 
-class FacialTensionRequest(BaseModel):
-    session_id: str
-    user_id: str
-    tension_index: float
-    blink_rate: float
-
-class FacialTensionResponse(BaseModel):
-    success: bool
-    recorded_index: float
-
-
 SPIKE_JITTER_MULTIPLIER = 2.0   # flag if jitter > 2x this user's baseline
 SPIKE_PITCH_DEVIATION_HZ = 25.0  # flag if pitch deviates > 25Hz from baseline
 MIN_SESSIONS_FOR_BASELINE = 3
 
+
+import subprocess
+
+def _convert_to_wav(input_path: str) -> str:
+    wav_path = input_path + "_converted.wav"
+    try:
+        subprocess.run(
+            ["ffmpeg", "-y", "-i", input_path, "-ar", "16000", "-ac", "1", wav_path],
+            check=True, capture_output=True, timeout=15
+        )
+    except FileNotFoundError:
+        raise ValueError("ffmpeg is missing from the system path.")
+    except subprocess.CalledProcessError as e:
+        raise ValueError(f"ffmpeg conversion failed: {e.stderr.decode('utf-8')}")
+    except subprocess.TimeoutExpired:
+        raise ValueError("ffmpeg conversion timed out.")
+    return wav_path
 
 @router.post("/voice", response_model=VoiceBiomarkerResponse)
 async def analyze_voice_chunk(
@@ -128,44 +138,54 @@ async def analyze_voice_chunk(
     biomarkers, compares against the user's rolling baseline, and flags
     a "spike" if this chunk deviates significantly.
     """
-    suffix = os.path.splitext(audio.filename or "chunk.wav")[1] or ".wav"
+    suffix = os.path.splitext(audio.filename or "chunk.webm")[1] or ".webm"
     with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as tmp:
         content = await audio.read()
         tmp.write(content)
         tmp_path = tmp.name
 
+    converted_wav_path = None
     try:
-        result = extract_voice_biomarkers(tmp_path)
+        converted_wav_path = _convert_to_wav(tmp_path)
+        result = extract_voice_biomarkers(converted_wav_path)
     except ValueError as e:
         raise HTTPException(status_code=422, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Analysis failed: {e}")
     finally:
-        os.unlink(tmp_path)
+        if os.path.exists(tmp_path):
+            os.unlink(tmp_path)
+        if converted_wav_path and os.path.exists(converted_wav_path):
+            os.unlink(converted_wav_path)
 
-    # Ensure user and session exist
+    # Ensure User exists
     user = await db.get(User, user_id)
     if not user:
         user = User(id=user_id, username=f"user_{user_id}")
         db.add(user)
         await db.commit()
-        
+        await db.refresh(user)
+
+    # Ensure Session exists
     session = await db.get(Session, session_id)
     if not session:
         session = Session(id=session_id, user_id=user_id)
         db.add(session)
         await db.commit()
+        await db.refresh(session)
 
-    # Save sample
-    new_sample = VoiceBiomarkerSample(
+    # Save to DB
+    sample = VoiceBiomarkerSample(
         session_id=session_id,
-        pitch_hz=result["pitch_hz"],
-        jitter_pct=result["jitter_pct"],
-        shimmer_pct=result["shimmer_pct"],
-        speech_rate_wpm=0.0 # Placeholder
+        pitch_hz=result.get("pitch_hz"),
+        jitter_pct=result.get("jitter_pct"),
+        shimmer_pct=result.get("shimmer_pct")
     )
-    db.add(new_sample)
+    db.add(sample)
     await db.commit()
+
+    count_query = await db.execute(select(VoiceBiomarkerSample).where(VoiceBiomarkerSample.session_id == session_id))
+    session_sample_count = len(count_query.scalars().all())
 
     # --- Spike detection against this user's historical baseline ---
     baseline = await _compute_baseline(user_id, db)
@@ -176,13 +196,9 @@ async def analyze_voice_chunk(
         if result["jitter_pct"] > baseline["avg_jitter"] * SPIKE_JITTER_MULTIPLIER:
             is_spike = True
             spike_reason = "jitter"
-        elif result["pitch_hz"] and baseline["avg_pitch"] and abs(result["pitch_hz"] - baseline["avg_pitch"]) > SPIKE_PITCH_DEVIATION_HZ:
+        elif result["pitch_hz"] and abs(result["pitch_hz"] - baseline["avg_pitch"]) > SPIKE_PITCH_DEVIATION_HZ:
             is_spike = True
             spike_reason = "pitch_deviation"
-
-    # Count session samples
-    stmt = select(func.count(VoiceBiomarkerSample.id)).where(VoiceBiomarkerSample.session_id == session_id)
-    session_sample_count = (await db.execute(stmt)).scalar() or 0
 
     return VoiceBiomarkerResponse(
         **result,
@@ -194,31 +210,37 @@ async def analyze_voice_chunk(
 
 async def _compute_baseline(user_id: str, db: AsyncSession) -> dict:
     """
-    Computes baseline from the database across all of this user's stored sessions.
+    Computes baseline across all of this user's stored sessions in PostgreSQL.
     """
-    stmt = (
+    query = await db.execute(
         select(VoiceBiomarkerSample)
-        .join(Session)
+        .join(Session, VoiceBiomarkerSample.session_id == Session.id)
         .where(Session.user_id == user_id)
-        .where(VoiceBiomarkerSample.jitter_pct.is_not(None))
     )
-    result = await db.execute(stmt)
-    all_samples = result.scalars().all()
-    
-    if len(all_samples) < MIN_SESSIONS_FOR_BASELINE:
-        return {"established": False, "sessions_completed": len(all_samples)}
+    all_samples = query.scalars().all()
 
-    avg_pitch = sum(s.pitch_hz for s in all_samples if s.pitch_hz) / len(all_samples)
-    avg_jitter = sum(s.jitter_pct for s in all_samples) / len(all_samples)
-    avg_shimmer = sum(s.shimmer_pct for s in all_samples if s.shimmer_pct) / len(all_samples)
+    valid_samples = [s for s in all_samples if s.jitter_pct is not None]
+    sessions_completed = len(set(s.session_id for s in valid_samples))
+
+    if sessions_completed < MIN_SESSIONS_FOR_BASELINE:
+        return {"established": False, "sessions_completed": sessions_completed}
+
+    pitch_samples = [s.pitch_hz for s in valid_samples if s.pitch_hz is not None]
+    avg_pitch = sum(pitch_samples) / len(pitch_samples) if pitch_samples else 0.0
+    
+    jitter_samples = [s.jitter_pct for s in valid_samples]
+    avg_jitter = sum(jitter_samples) / len(jitter_samples)
+    
+    shimmer_samples = [s.shimmer_pct for s in valid_samples if s.shimmer_pct is not None]
+    avg_shimmer = sum(shimmer_samples) / len(shimmer_samples) if shimmer_samples else 0.0
 
     return {
         "established": True,
-        "sessions_completed": len(all_samples),
-        "avg_pitch": round(avg_pitch, 2) if avg_pitch else None,
+        "sessions_completed": sessions_completed,
+        "avg_pitch": round(avg_pitch, 2),
         "avg_jitter": round(avg_jitter, 3),
-        "avg_shimmer": round(avg_shimmer, 3) if avg_shimmer else None,
-        "sample_count": len(all_samples),
+        "avg_shimmer": round(avg_shimmer, 3),
+        "sample_count": len(valid_samples),
     }
 
 
@@ -235,32 +257,3 @@ async def get_baseline(user_id: str, db: AsyncSession = Depends(get_db)):
         avg_shimmer=baseline["avg_shimmer"],
         sample_count=baseline["sample_count"],
     )
-
-@router.post("/facial", response_model=FacialTensionResponse)
-async def record_facial_tension(
-    req: FacialTensionRequest,
-    db: AsyncSession = Depends(get_db)
-):
-    # Ensure session exists (assume user is already created from voice chunks if not we'd do it here too)
-    session = await db.get(Session, req.session_id)
-    if not session:
-        # Create user and session if missing just in case
-        user = await db.get(User, req.user_id)
-        if not user:
-            user = User(id=req.user_id, username=f"user_{req.user_id}")
-            db.add(user)
-            await db.commit()
-            
-        session = Session(id=req.session_id, user_id=req.user_id)
-        db.add(session)
-        await db.commit()
-
-    sample = FacialTensionSample(
-        session_id=req.session_id,
-        tension_index=req.tension_index,
-        blink_rate=req.blink_rate
-    )
-    db.add(sample)
-    await db.commit()
-    
-    return FacialTensionResponse(success=True, recorded_index=req.tension_index)
