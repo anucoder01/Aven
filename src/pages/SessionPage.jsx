@@ -18,6 +18,7 @@ import { soundscapeEngine } from '../services/soundscapeEngine'
 import { BiomarkerConsentModal } from '../components/therapy/BiomarkerConsentModal'
 import { faceTensionEngine } from '../services/faceTensionEngine'
 import { speak, stopSpeaking } from '../services/ttsEngine'
+import { useVoiceBiomarkers } from '../hooks/useVoiceBiomarkers'
 
 // DISTORTION_COLORS removed
 
@@ -154,7 +155,16 @@ export default function SessionPage() {
   const { customScenarios } = useUserStore()
   
   const scenario = characters.find(s => s.id === scenarioId) || customScenarios?.find(s => s.id === scenarioId) || characters[0]
-  const level = scenario.levels.find(l => l.level === parseInt(levelNum)) || scenario.levels[0]
+  
+  const fallbackLevels = [
+    { level: 1, label: "Cooperative" },
+    { level: 2, label: "Neutral" },
+    { level: 3, label: "Dismissive" },
+    { level: 4, label: "Difficult" },
+    { level: 5, label: "Hostile" }
+  ];
+  const scenarioLevels = scenario.levels || fallbackLevels;
+  const level = scenarioLevels.find(l => l.level === parseInt(levelNum)) || scenarioLevels[0]
 
   const { messages, liveStats, isCharacterTyping, isRecording,
     startSession, addMessage, addDistortions, addAvoidance,
@@ -173,6 +183,9 @@ export default function SessionPage() {
 
   const [consentState, setConsentState] = useState(null)
   const [facialTension, setFacialTension] = useState(null)
+
+  // Capture voice biomarkers using MediaRecorder continuously while in voice mode
+  useVoiceBiomarkers({ isVoiceMode, sessionId: scenarioId, userId: 'test_user' })
 
   const { buildMemoryContext } = useCharacterMemoryStore()
   const memoryContextRef = useRef('')
@@ -352,27 +365,40 @@ export default function SessionPage() {
       })
       
       let aiResponse = ""
-      if (aiRes.ok) {
-        // Handle SSE stream briefly
-        const reader = aiRes.body.getReader()
-        const decoder = new TextDecoder()
-        let done = false
-        while (!done) {
-          const { value, done: readerDone } = await reader.read()
-          done = readerDone
-          if (value) {
-            const chunk = decoder.decode(value)
-            const lines = chunk.split('\n')
-            for (const line of lines) {
-              if (line.startsWith('data: ') && line !== 'data: [DONE]') {
-                const data = JSON.parse(line.replace('data: ', ''))
-                aiResponse += data.delta
+        if (aiRes.ok) {
+          // Handle SSE stream briefly
+          const reader = aiRes.body.getReader()
+          const decoder = new TextDecoder()
+          let done = false
+          let buffer = ""
+          while (!done) {
+            const { value, done: readerDone } = await reader.read()
+            done = readerDone
+            if (value) {
+              buffer += decoder.decode(value, { stream: !done })
+              const lines = buffer.split('\n')
+              // Keep the last element in the buffer since it might be an incomplete line
+              buffer = lines.pop()
+              
+              for (const line of lines) {
+                const trimmed = line.trim()
+                if (trimmed.startsWith('data: ') && trimmed !== 'data: [DONE]') {
+                  try {
+                    const data = JSON.parse(trimmed.replace('data: ', ''))
+                    if (data.delta) {
+                      aiResponse += data.delta
+                    }
+                  } catch (parseError) {
+                    console.warn("Failed to parse SSE data chunk:", trimmed)
+                  }
+                }
               }
             }
           }
-        }
-      } else {
-        throw new Error("API failed")
+        } else {
+        const errorText = await aiRes.text()
+        console.error("Backend returned error:", aiRes.status, errorText)
+        throw new Error("API failed: " + errorText)
       }
 
       if (!aiResponse) aiResponse = "I'm not sure what to say to that."
@@ -422,17 +448,23 @@ export default function SessionPage() {
 
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition
     const recognition = new SpeechRecognition()
-    recognition.continuous = false
+    recognition.continuous = true
     recognition.interimResults = false
     recognition.lang = 'en-US'
 
     recognition.onstart = () => { setRecording(true); setOrbState('listening') }
     recognition.onresult = (e) => {
-      const transcript = e.results[0][0].transcript
+      // Get the latest result
+      const last = e.results.length - 1
+      const transcript = e.results[last][0].transcript
       handleSend(transcript)
     }
     recognition.onend = () => { setRecording(false); setOrbState('idle') }
-    recognition.onerror = () => { setRecording(false); setOrbState('idle') }
+    recognition.onerror = (e) => { 
+      console.error('Speech recognition error:', e.error, e.message)
+      setRecording(false); 
+      setOrbState('idle') 
+    }
 
     recognitionRef.current = recognition
     recognition.start()
@@ -594,6 +626,7 @@ export default function SessionPage() {
           <div className="glass rounded-2xl flex-1 flex flex-col overflow-hidden">
             {/* Messages */}
             <div className="flex-1 overflow-y-auto p-4 space-y-1">
+              <video ref={videoRef} autoPlay playsInline muted className="hidden" />
               {messages.map((msg) => (
                 <ChatBubble key={msg.id} message={msg} />
               ))}

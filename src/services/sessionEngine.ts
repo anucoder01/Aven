@@ -81,26 +81,34 @@ export const sessionEngine = {
     }
     if (!character) throw new Error(`Character ${characterId} not found`);
 
-    const levelObj = character.levels.find(l => l.level === difficultyLevel) || character.levels[0];
+    const fallbackLevels = [
+      { level: 1, label: "Cooperative" },
+      { level: 2, label: "Neutral" },
+      { level: 3, label: "Dismissive" },
+      { level: 4, label: "Difficult" },
+      { level: 5, label: "Hostile" }
+    ];
+    const characterLevels = character.levels || fallbackLevels;
+    const levelObj = characterLevels.find((l: any) => l.level === difficultyLevel) || characterLevels[0];
     
     // Extract last 6 exchanges and summarize them briefly
     const lastSix = conversationHistory.slice(-6);
     const historyText = lastSix.map(m => `${m.role.toUpperCase()}: ${m.content || m.text}`).join(' | ');
     const historySummary = historyText ? historyText.substring(0, 500) : "No history yet.";
 
-    let prompt = character.systemPrompt;
+    let prompt = character.systemPrompt || `You are ${character.name}. CONTEXT: Respond in character. RULES: 1-3 sentences. USER SAID: {user_message}. HISTORY: {history}. DIFFICULTY: {level} — {level_desc}`;
     
     if (isReversal) {
-      prompt = `ROLE REVERSAL MODE: The human user is playing the role of ${character.name}, who is: ${character.identity}. You, the AI, are playing the role of the User (a healthy, assertive individual setting boundaries). Model ideal communication, emotional regulation, and cognitive flexibility. Do not fall into the traps of the antagonist. \n\nAntagonist prompt context (for your reference on how they might act): ${prompt}`;
+      prompt = `ROLE REVERSAL MODE: The human user is playing the role of ${character.name || 'the character'}, who is: ${character.identity || 'the antagonist'}. You, the AI, are playing the role of the User (a healthy, assertive individual setting boundaries). Model ideal communication, emotional regulation, and cognitive flexibility. Do not fall into the traps of the antagonist. \n\nAntagonist prompt context (for your reference on how they might act): ${prompt}`;
     }
 
     // Replace template variables
-    prompt = prompt.replace('{user_message}', userMessage);
-    prompt = prompt.replace('{history}', historySummary);
+    prompt = prompt.replace('{user_message}', userMessage || '');
+    prompt = prompt.replace('{history}', historySummary || '');
     prompt = prompt.replace('{level}', `L${difficultyLevel}`);
-    prompt = prompt.replace('{level_desc}', levelObj.label);
+    prompt = prompt.replace('{level_desc}', levelObj ? levelObj.label : '');
 
-    const guidance = this.getResponseMapGuidance(characterId, userMessage);
+    const guidance = this.getResponseMapGuidance(characterId, userMessage || '');
     if (guidance && !isReversal) {
       prompt += `\n\n${guidance}`;
     }

@@ -7,7 +7,7 @@ import { useUserStore } from '../store/userStore'
 
 export default function CustomScenarioBuilder() {
   const navigate = useNavigate()
-  const { addCustomScenario } = useUserStore()
+  const { addCustomScenario, customScenarios } = useUserStore()
 
   const [formData, setFormData] = useState({
     characterName: '',
