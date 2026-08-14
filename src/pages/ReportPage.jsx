@@ -249,14 +249,25 @@ export default function ReportPage() {
     )
   }
 
-  if (!report || error) {
+  if (!report || error || report.error) {
     return (
-      <div className="min-h-screen relative flex items-center justify-center" style={{ background: '#07071a' }}>
+      <div className="min-h-screen relative flex items-center justify-center p-6" style={{ background: '#07071a' }}>
         <AuroraBackground />
-        <div className="relative z-10 text-center text-rose-400">
-          <AlertTriangle className="mb-4 mx-auto" size={24} />
-          <p>Failed to generate report.</p>
-          <button onClick={() => navigate('/')} className="btn-ghost mt-4">Go Back</button>
+        <div className="relative z-10 w-full max-w-2xl text-center text-rose-400 glass p-8 rounded-2xl">
+          <AlertTriangle className="mb-4 mx-auto" size={32} />
+          <h2 className="text-xl font-bold mb-2">Failed to parse report</h2>
+          <p className="text-sm text-text-secondary mb-6">{error?.message || report?.error || 'Unknown error'}</p>
+          
+          {report?.raw_output && (
+            <div className="text-left bg-black/40 rounded-xl p-4 overflow-y-auto max-h-64 mt-4 border border-white/[0.05]">
+              <p className="text-xs text-text-muted mb-2 uppercase tracking-widest font-semibold">Raw LLM Output (Unformatted):</p>
+              <pre className="text-xs text-text-primary whitespace-pre-wrap font-mono">
+                {report.raw_output}
+              </pre>
+            </div>
+          )}
+          
+          <button onClick={() => navigate('/')} className="btn-ghost mt-6 border border-white/10">Go Back</button>
         </div>
       </div>
     )

@@ -258,10 +258,26 @@ async def generate_report(req: ReportRequest):
             temperature=0.3,
             response_format={"type": "json_object"},
         )
-        return json.loads(response.choices[0].message.content)
+        raw_text = response.choices[0].message.content
+        
+        # Clean up markdown code blocks if the model mistakenly included them
+        clean_text = raw_text.strip()
+        if clean_text.startswith("```json"):
+            clean_text = clean_text[7:]
+        elif clean_text.startswith("```"):
+            clean_text = clean_text[3:]
+        if clean_text.endswith("```"):
+            clean_text = clean_text[:-3]
+            
+        import re
+        match = re.search(r"\{.*\}", clean_text, re.DOTALL)
+        if match:
+            clean_text = match.group(0)
+            
+        return json.loads(clean_text)
     except Exception as e:
-        print(f"Error generating report: {e}")
-        return {"error": str(e), "traceback": "Check backend logs"}
+        print(f"Error generating report: {e}\nRaw Output: {response.choices[0].message.content if 'response' in locals() else 'None'}")
+        return {"error": f"LLM failed to produce valid JSON: {str(e)}", "raw_output": response.choices[0].message.content if 'response' in locals() else 'None'}
 
 
 @router.post("/generate-scenario")
