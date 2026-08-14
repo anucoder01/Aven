@@ -1,65 +1,86 @@
-import { FaceLandmarker, FilesetResolver } from '@mediapipe/tasks-vision'
+import { FaceLandmarker, FilesetResolver } from '@mediapipe/tasks-vision';
 
-let faceLandmarker = null
+class FaceTensionEngine {
+  constructor() {
+    this.faceLandmarker = null;
+    this.isInitializing = false;
+  }
 
-export const faceTensionEngine = {
   async init() {
-    if (faceLandmarker) return
-    const filesetResolver = await FilesetResolver.forVisionTasks(
-      "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm"
-    )
-    faceLandmarker = await FaceLandmarker.createFromOptions(filesetResolver, {
-      baseOptions: {
-        modelAssetPath: "https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task",
-        delegate: "GPU"
-      },
-      outputFaceBlendshapes: true,
-      runningMode: "VIDEO",
-      numFaces: 1
-    })
-  },
-
-  /**
-   * Computes a rough "tension index" from blendshapes.
-   * Note: This is an invented proxy, not a clinically validated scale.
-   * We heavily weight brow lowering (furrowing) and lip pressing, 
-   * which are typical physiological responses to stress/concentration.
-   */
-  computeTension(blendshapes) {
-    if (!blendshapes || blendshapes.length === 0) return { tensionIndex: 0, blinkRate: 0 }
+    if (this.faceLandmarker || this.isInitializing) return;
+    this.isInitializing = true;
     
-    const shapes = blendshapes[0].categories
-    const getShape = (name) => shapes.find(s => s.categoryName === name)?.score || 0
+    try {
+      const vision = await FilesetResolver.forVisionTasks(
+        "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.12/wasm"
+      );
+      
+      this.faceLandmarker = await FaceLandmarker.createFromOptions(vision, {
+        baseOptions: {
+          modelAssetPath: `https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task`,
+          delegate: "GPU"
+        },
+        outputFaceBlendshapes: true,
+        runningMode: "VIDEO",
+        numFaces: 1
+      });
+      console.log("FaceLandmarker initialized successfully.");
+    } catch (err) {
+      console.error("Failed to initialize FaceLandmarker:", err);
+    } finally {
+      this.isInitializing = false;
+    }
+  }
 
-    const browDownL = getShape("browDownLeft")
-    const browDownR = getShape("browDownRight")
-    const lipPressL = getShape("lipPressLeft")
-    const lipPressR = getShape("lipPressRight")
-    const jawClench = getShape("jawClench")
+  async predictVideo(videoElement, timestamp) {
+    if (!this.faceLandmarker) {
+      await this.init();
+    }
     
-    // Blink rate proxy (just instantaneous eye closure for now, true rate needs rolling window)
-    const eyeBlinkL = getShape("eyeBlinkLeft")
-    const eyeBlinkR = getShape("eyeBlinkRight")
-    const blinkInst = (eyeBlinkL + eyeBlinkR) / 2
+    if (!this.faceLandmarker) return null;
 
-    // Weighted sum
-    // Brows heavily indicate concern/stress
-    const tensionIndex = ((browDownL + browDownR) * 0.4) + 
-                         ((lipPressL + lipPressR) * 0.3) + 
-                         (jawClench * 0.3)
-                         
-    return {
-      tensionIndex: tensionIndex * 100, // scale to 0-100
-      blinkRate: blinkInst // this is just a single frame snapshot proxy
-    }
-  },
+    try {
+      const results = this.faceLandmarker.detectForVideo(videoElement, timestamp);
+      if (results.faceBlendshapes && results.faceBlendshapes.length > 0) {
+        const blendshapes = results.faceBlendshapes[0].categories;
+        
+        // Helper to get score of a specific blendshape
+        const getScore = (name) => {
+          const bs = blendshapes.find(b => b.categoryName === name);
+          return bs ? bs.score : 0;
+        };
 
-  async predictVideo(videoElement, timeMs) {
-    if (!faceLandmarker) await this.init()
-    const results = faceLandmarker.detectForVideo(videoElement, timeMs)
-    if (results.faceBlendshapes && results.faceBlendshapes.length > 0) {
-      return this.computeTension(results.faceBlendshapes)
+        // Note: These are derived heuristics correlated with facial tension,
+        // not a clinically validated scale. We use brow lowering, lip pressing,
+        // and eye blinking/squinting as proxies for tension.
+        const browLowerL = getScore("browDownLeft");
+        const browLowerR = getScore("browDownRight");
+        const lipPressL = getScore("mouthPressLeft");
+        const lipPressR = getScore("mouthPressRight");
+        const eyeBlinkL = getScore("eyeBlinkLeft");
+        const eyeBlinkR = getScore("eyeBlinkRight");
+        const squintL = getScore("eyeSquintLeft");
+        const squintR = getScore("eyeSquintRight");
+
+        const avgBrowLower = (browLowerL + browLowerR) / 2;
+        const avgLipPress = (lipPressL + lipPressR) / 2;
+        const avgBlink = (eyeBlinkL + eyeBlinkR) / 2;
+        const avgSquint = (squintL + squintR) / 2;
+
+        // Weighted tension index (0 to 1 range approx)
+        const tensionIndex = (avgBrowLower * 0.4) + (avgLipPress * 0.3) + (avgSquint * 0.3);
+
+        return {
+          tensionIndex: tensionIndex,
+          blinkRate: avgBlink, 
+          raw: { avgBrowLower, avgLipPress, avgSquint }
+        };
+      }
+    } catch (err) {
+      // Ignore occasional video processing errors
     }
-    return null
+    return null;
   }
 }
+
+export const faceTensionEngine = new FaceTensionEngine();

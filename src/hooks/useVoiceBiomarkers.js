@@ -1,107 +1,88 @@
-import { useEffect, useRef, useCallback } from 'react'
-import { useBodyStore } from '../store/bodyStore'
+import { useEffect, useRef } from 'react';
+import { useBodyStore } from '../store/bodyStore';
 
-export function useVoiceBiomarkers(active, sessionId) {
-  const mediaRecorderRef = useRef(null)
-  const chunksRef = useRef([])
-  const { biomarkerBaseline, addSpike, updateBaseline } = useBodyStore()
+export function useVoiceBiomarkers({ isVoiceMode, sessionId, userId = 'test_user' }) {
+  const mediaRecorderRef = useRef(null);
+  const streamRef = useRef(null);
+  const { addSpikeEvent } = useBodyStore();
 
-  const startRecording = useCallback(async () => {
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
-      const mediaRecorder = new MediaRecorder(stream)
-      mediaRecorderRef.current = mediaRecorder
+  useEffect(() => {
+    let active = true;
 
-      mediaRecorder.ondataavailable = async (e) => {
-        if (e.data.size > 0) {
-          // Post chunk to backend
-          const blob = new Blob([e.data], { type: 'audio/webm' })
-          const formData = new FormData()
-          formData.append('audio', blob)
-          formData.append('session_id', sessionId || 'test-session')
-          formData.append('user_id', 'test_user')
+    if (isVoiceMode) {
+      navigator.mediaDevices.getUserMedia({ audio: true })
+        .then((stream) => {
+          if (!active) {
+            stream.getTracks().forEach(track => track.stop());
+            return;
+          }
+          
+          streamRef.current = stream;
+          // Use webm as it is the standard for MediaRecorder in most browsers
+          const options = { mimeType: 'audio/webm' };
+          const recorder = new MediaRecorder(stream, options);
+          mediaRecorderRef.current = recorder;
 
-          try {
-            const res = await fetch('http://localhost:8000/biomarker/voice', {
-              method: 'POST',
-              body: formData,
-            })
-            
-            if (res.ok) {
-              const result = await res.json()
-              const data = result // Depending on backend response structure, it might be the top-level JSON
-              
-              // Check for spikes
-              if (biomarkerBaseline) {
-                const pitchDev = (data.pitch_hz - biomarkerBaseline.avg_pitch) / biomarkerBaseline.avg_pitch
-                const jitterDev = data.jitter_pct - biomarkerBaseline.avg_jitter
+          recorder.ondataavailable = async (e) => {
+            if (e.data && e.data.size > 0) {
+              // Send the chunk to the backend
+              const formData = new FormData();
+              formData.append('audio', e.data, 'chunk.webm');
+              formData.append('session_id', String(sessionId));
+              formData.append('user_id', String(userId));
 
-                if (pitchDev > 0.15 || jitterDev > 1.5) { // Arbitrary spike thresholds
-                  addSpike({
-                    type: 'vocal',
-                    pitchDelta: pitchDev * 100,
-                    jitterDelta: jitterDev,
-                    rawPitch: data.pitch_hz,
-                  })
+              try {
+                const response = await fetch('http://localhost:8000/biomarker/voice', {
+                  method: 'POST',
+                  body: formData,
+                });
+                
+                if (response.ok) {
+                  const result = await response.json();
+                  console.log('Voice biomarker extracted:', result);
+                  if (result.is_spike) {
+                    addSpikeEvent({
+                      type: 'voice',
+                      reason: result.spike_reason,
+                      jitter: result.jitter_pct,
+                      timestamp: new Date().toISOString()
+                    });
+                  }
                 }
-              } else {
-                // Not established yet, do nothing.
+              } catch (err) {
+                console.error("Failed to upload voice chunk for biomarker analysis:", err);
               }
             }
-          } catch (err) {
-            console.warn("Voice biomarker analysis failed", err)
-          }
-        }
-      }
+          };
 
-      mediaRecorder.onstop = () => {
-        // Nothing special on stop, chunks were handled in ondataavailable
+          // Capture a chunk every 6 seconds
+          recorder.start(6000);
+        })
+        .catch((err) => {
+          console.warn('Microphone permission denied or unavailable for voice biomarkers:', err);
+          // Graceful degradation: do not crash the session
+        });
+    } else {
+      // Stop recording if active
+      if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+        mediaRecorderRef.current.stop();
       }
-
-      // Record in 5-second chunks
-      mediaRecorder.start(5000)
-
-      return () => {
-        if (mediaRecorder.state === 'recording') {
-          mediaRecorder.stop()
-        }
-        stream.getTracks().forEach(track => track.stop())
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach(track => track.stop());
+        streamRef.current = null;
       }
-    } catch (e) {
-      console.warn("Mic access denied for biomarkers", e)
-      return () => {}
     }
-  }, [sessionId, biomarkerBaseline, addSpike])
 
-  useEffect(() => {
-    const fetchBaseline = async () => {
-      try {
-        const res = await fetch(`http://localhost:8000/biomarker/voice/baseline/test_user`);
-        if (res.ok) {
-          const data = await res.json();
-          if (data.established) {
-            updateBaseline({
-              avg_pitch: data.avg_pitch,
-              avg_jitter: data.avg_jitter,
-              avg_shimmer: data.avg_shimmer,
-              sampleCount: data.sample_count
-            });
-          }
-        }
-      } catch (err) {
-        console.warn("Could not fetch baseline", err);
+    return () => {
+      active = false;
+      if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+        mediaRecorderRef.current.stop();
+      }
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach(track => track.stop());
+        streamRef.current = null;
       }
     };
-    fetchBaseline();
-  }, [updateBaseline]);
+  }, [isVoiceMode, sessionId, userId, addSpikeEvent]);
 
-  useEffect(() => {
-    let cleanup = () => {}
-    if (active) {
-      startRecording().then(c => cleanup = c)
-    }
-    return () => {
-      cleanup()
-    }
-  }, [active, startRecording])
 }
