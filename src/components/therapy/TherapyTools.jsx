@@ -1,8 +1,9 @@
 import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Plus, Trash2, ChevronRight, Check, ExternalLink, Brain, MessageSquare, FlaskConical, Eye, Info, X } from 'lucide-react'
+import { Plus, Trash2, ChevronRight, Check, ExternalLink, Brain, MessageSquare, FlaskConical, Eye, Info, X, Target, ArrowRight } from 'lucide-react'
 import { useTherapyStore } from '../../store/therapyStore'
 import { useSessionStore } from '../../store/sessionStore'
+import { useUserStore } from '../../store/userStore'
 import { DISTORTION_LABELS } from '../../data/scenarios'
 import { useNavigate } from 'react-router-dom'
 
@@ -409,11 +410,17 @@ function SUDSColor(suds) {
 
 export function FearHierarchyTab() {
   const { fearHierarchy, addFearItem, deleteFearItem, markFearPracticed } = useTherapyStore()
+  const { completedReports } = useUserStore()
   const navigate = useNavigate()
   const [adding, setAdding] = useState(false)
   const [newItem, setNewItem] = useState({ situation: '', suds: 50 })
 
-  const practicedCount = fearHierarchy.filter(i => i.practiced).length
+  const enrichedHierarchy = fearHierarchy.map(item => ({
+    ...item,
+    isPracticed: item.practiced || (item.scenarioId && completedReports.some(r => r.scenario_id === item.scenarioId))
+  }))
+
+  const practicedCount = enrichedHierarchy.filter(i => i.isPracticed).length
 
   return (
     <div className="space-y-4">
@@ -440,12 +447,12 @@ export function FearHierarchyTab() {
         <div className="flex-1 h-2 rounded-full bg-white/[0.05] overflow-hidden">
           <motion.div
             className="h-full rounded-full bg-teal-400"
-            animate={{ width: `${(practicedCount / fearHierarchy.length) * 100}%` }}
+            animate={{ width: `${(practicedCount / enrichedHierarchy.length) * 100}%` }}
             transition={{ duration: 0.8 }}
           />
         </div>
         <div className="text-sm text-teal-400 font-semibold">
-          {Math.round((practicedCount / fearHierarchy.length) * 100)}%
+          {Math.round((practicedCount / enrichedHierarchy.length) * 100) || 0}%
         </div>
       </div>
 
@@ -481,20 +488,20 @@ export function FearHierarchyTab() {
       </AnimatePresence>
 
       <div className="space-y-2">
-        {fearHierarchy.map((item, index) => (
+        {enrichedHierarchy.map((item, index) => (
           <motion.div
             key={item.id}
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: index * 0.03 }}
-            className={`glass rounded-xl p-3 flex items-center gap-3 transition-all ${item.practiced ? 'opacity-60' : ''}`}
+            className={`glass rounded-xl p-3 flex items-center gap-3 transition-all ${item.isPracticed ? 'opacity-60' : ''}`}
           >
             <div className="flex-shrink-0 w-12 text-center">
               <div className="text-lg font-bold" style={{ color: SUDSColor(item.suds) }}>{item.suds}</div>
               <div className="text-[9px] text-text-muted">SUDS</div>
             </div>
             <div className="flex-1 min-w-0">
-              <div className={`text-sm font-medium ${item.practiced ? 'line-through text-text-muted' : 'text-text-primary'}`}>
+              <div className={`text-sm font-medium ${item.isPracticed ? 'line-through text-text-muted' : 'text-text-primary'}`}>
                 {item.situation}
               </div>
             </div>
@@ -509,7 +516,7 @@ export function FearHierarchyTab() {
               )}
               <button
                 onClick={() => markFearPracticed(item.id)}
-                className={`p-1.5 rounded-lg transition-colors ${item.practiced ? 'text-teal-400' : 'text-text-muted hover:text-teal-400'}`}
+                className={`p-1.5 rounded-lg transition-colors ${item.isPracticed ? 'text-teal-400' : 'text-text-muted hover:text-teal-400'}`}
               >
                 <Check size={13} />
               </button>

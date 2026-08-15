@@ -189,7 +189,7 @@ function DistortionCard({ distortion, index }) {
 
 export default function ReportPage() {
   const navigate = useNavigate()
-  const { messages, distortionEvents } = useSessionStore()
+  const { messages, distortionEvents, activeSession } = useSessionStore()
   const { addReport } = useUserStore()
   const [report, setReport] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -208,8 +208,8 @@ export default function ReportPage() {
           })),
           distortion_events: distortionEvents || [],
           avoidance_events: [], // add from stats if available
-          scenario_id: 'current_session',
-          difficulty_level: 1
+          scenario_id: activeSession?.scenario?.id || 'current_session',
+          difficulty_level: activeSession?.level?.level || 1
         }
         
         const res = await fetch('http://localhost:8000/llm/report', {
