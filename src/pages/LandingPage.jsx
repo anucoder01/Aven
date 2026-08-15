@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Brain, Mic, BarChart3, ChevronRight, Sparkles, Star, Lock, Plus, Loader2 } from 'lucide-react'
@@ -7,6 +7,7 @@ import AuroraBackground from '../components/3d/AuroraBackground'
 import { characters as SCENARIOS, CHARACTER_DOMAINS as DOMAINS } from '../data/characterLibrary'
 import { useUserStore } from '../store/userStore'
 import { getMaxUnlockedLevel } from '../lib/adaptiveDifficulty'
+import { speak } from '../services/ttsEngine'
 
 const DIFFICULTY_LABELS = ['', 'Cooperative', 'Skeptical', 'Dismissive', 'Critical', 'Hostile']
 const DIFFICULTY_COLORS = ['', '#2dd4bf', '#a78bfa', '#fbbf24', '#fb923c', '#fb7185']
@@ -34,6 +35,104 @@ export default function LandingPage() {
   const [customPrompt, setCustomPrompt] = useState('')
   const [isGenerating, setIsGenerating] = useState(false)
   const [isReversal, setIsReversal] = useState(false)
+
+  const [orbState, setOrbState] = useState('idle')
+  const [isListening, setIsListening] = useState(false)
+  const recognitionRef = useRef(null)
+
+  const handleOrbClick = () => {
+    if (!('webkitSpeechRecognition' in window || 'SpeechRecognition' in window)) {
+      alert('Voice recognition not supported in this browser.')
+      return
+    }
+
+    if (isListening) {
+      recognitionRef.current?.stop()
+      setIsListening(false)
+      setOrbState('idle')
+      return
+    }
+
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition
+    const recognition = new SpeechRecognition()
+    recognition.continuous = false
+    recognition.interimResults = false
+    recognition.lang = 'en-US'
+
+    recognition.onstart = () => {
+      setIsListening(true)
+      setOrbState('listening')
+    }
+
+    recognition.onresult = async (e) => {
+      const originalTranscript = e.results[0][0].transcript
+      console.log('Voice recognized:', originalTranscript)
+      
+      // Remove punctuation to handle things like "Hi, Aven."
+      const transcript = originalTranscript.toLowerCase().replace(/[.,!?;:]/g, '')
+      
+      // Check for standalone greetings or 'aven' using word boundaries
+      const greetingRegex = /\b(hi|hello|hey|hola|sup|greetings|howdy|aven|even|heaven)\b/
+      
+      let responseText = ""
+      
+      const hour = new Date().getHours()
+      const isMorning = hour < 12
+      const isAfternoon = hour >= 12 && hour < 18
+      const isEvening = hour >= 18
+
+      if (transcript.includes('how are you')) {
+        responseText = "I'm doing well, thank you. How was your day?"
+      } else if (transcript.includes('who are you') || transcript.includes('what are you')) {
+        responseText = "I am Aven. I'm here to help you practice difficult conversations."
+      } else if (transcript.includes('what can you do') || transcript.includes('help me')) {
+        responseText = "I can roleplay stressful scenarios with you to help build your confidence."
+      } else if (transcript.includes('good morning')) {
+        if (isMorning) responseText = "Good morning to you too!"
+        else if (isAfternoon) responseText = "It's actually afternoon, but I admire your morning energy!"
+        else responseText = "A bit late for morning, don't you think? But good evening!"
+      } else if (transcript.includes('good afternoon')) {
+        if (isAfternoon) responseText = "Good afternoon!"
+        else if (isMorning) responseText = "Someone's eager for lunch! It's still morning, but hello anyway."
+        else responseText = "The afternoon has passed us by, I'm afraid. Good evening!"
+      } else if (transcript.includes('good evening') || transcript.includes('good night')) {
+        if (isEvening) responseText = "Good evening to you too."
+        else if (isMorning) responseText = "Is it bedtime already? It's still morning!"
+        else responseText = "A bit early for that, it's only the afternoon. But hello!"
+      } else if (greetingRegex.test(transcript)) {
+        if (isMorning) responseText = "Hello, good morning."
+        else if (isAfternoon) responseText = "Hello, good afternoon."
+        else responseText = "Hello, good evening."
+      } else {
+        const fallbacks = [
+            "I'm just a simple Orb right now, but I'm very talkative inside a practice session!",
+            "I heard you, but I'm saving all my good advice for the actual therapy scenarios below.",
+            "That's interesting! You should pick a scenario below and we can talk about it for real."
+        ]
+        responseText = fallbacks[Math.floor(Math.random() * fallbacks.length)]
+      }
+      
+      if (responseText) {
+        setOrbState('speaking')
+        await speak(responseText, { rate: 1.0 })
+        setOrbState('idle')
+      }
+    }
+
+    recognition.onend = () => {
+      setIsListening(false)
+      setOrbState(prev => prev === 'speaking' ? 'speaking' : 'idle')
+    }
+
+    recognition.onerror = (e) => {
+      console.error('Speech recognition error:', e.error)
+      setIsListening(false)
+      setOrbState('idle')
+    }
+
+    recognitionRef.current = recognition
+    recognition.start()
+  }
 
   const scenariosInDomain = selectedDomain
     ? (selectedDomain === 'custom' ? customScenarios || [] : SCENARIOS.filter(s => s.domain === selectedDomain))
@@ -94,7 +193,7 @@ export default function LandingPage() {
           transition={{ duration: 1, ease: [0.16, 1, 0.3, 1] }}
           className="mb-6"
         >
-          <AvenOrb state="idle" amplitude={0} size={200} />
+          <AvenOrb state={orbState} amplitude={isListening ? 0.5 : 0} size={200} onClick={handleOrbClick} />
         </motion.div>
 
         <motion.div

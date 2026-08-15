@@ -119,9 +119,13 @@ function ParticleRing({ state = 'idle' }) {
   )
 }
 
-export default function AvenOrb({ state = 'idle', amplitude = 0, size = 300 }) {
+export default function AvenOrb({ state = 'idle', amplitude = 0, size = 300, onClick }) {
   return (
-    <div style={{ width: size, height: size }} className="relative">
+    <div 
+      style={{ width: size, height: size }} 
+      className={`relative ${onClick ? 'cursor-pointer hover:scale-105 transition-transform duration-300' : ''}`}
+      onClick={onClick}
+    >
       <Canvas
         camera={{ position: [0, 0, 4], fov: 45 }}
         gl={{ antialias: true, alpha: true }}
