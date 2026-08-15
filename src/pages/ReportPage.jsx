@@ -221,7 +221,7 @@ export default function ReportPage() {
         const data = await res.json()
         setReport(data)
         
-        if (!reportSavedRef.current) {
+        if (!reportSavedRef.current && !data.error) {
           addReport(data)
           reportSavedRef.current = true
         }
