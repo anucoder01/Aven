@@ -25,16 +25,16 @@ export const useTherapyStore = create((set, get) => ({
 
   // ─── Fear Hierarchy ───
   fearHierarchy: [
-    { id: 1, situation: 'Making eye contact with a stranger', suds: 20, practiced: false, scenarioId: 'B1' },
-    { id: 2, situation: 'Asking for directions from a stranger', suds: 35, practiced: false, scenarioId: 'B1' },
-    { id: 3, situation: 'Making a complaint at a restaurant', suds: 40, practiced: false, scenarioId: 'D3' },
-    { id: 4, situation: 'Disagreeing with a friend\'s opinion', suds: 50, practiced: false, scenarioId: 'C1' },
-    { id: 5, situation: 'Returning a defective item to a store', suds: 55, practiced: false, scenarioId: 'D1' },
-    { id: 6, situation: 'Making small talk with a colleague', suds: 60, practiced: false, scenarioId: 'E1' },
-    { id: 7, situation: 'Disagreeing in a group meeting', suds: 70, practiced: false, scenarioId: 'C1' },
-    { id: 8, situation: 'Asking a friend for emotional support', suds: 75, practiced: false, scenarioId: 'F1' },
-    { id: 9, situation: 'Defending my work to a senior person', suds: 80, practiced: false, scenarioId: 'A1' },
-    { id: 10, situation: 'Setting a boundary with a parent', suds: 90, practiced: false, scenarioId: 'A5' },
+    { id: 1, situation: 'Making eye contact with a stranger', suds: 20, practiced: false, scenarioId: 'stranger' },
+    { id: 2, situation: 'Asking for directions from a stranger', suds: 35, practiced: false, scenarioId: 'stranger' },
+    { id: 3, situation: 'Making a complaint at a restaurant', suds: 40, practiced: false, scenarioId: 'customer_service' },
+    { id: 4, situation: 'Disagreeing with a friend\'s opinion', suds: 50, practiced: false, scenarioId: 'study_circle' },
+    { id: 5, situation: 'Returning a defective item to a store', suds: 55, practiced: false, scenarioId: 'customer_service' },
+    { id: 6, situation: 'Making small talk with a colleague', suds: 60, practiced: false, scenarioId: 'tanya' },
+    { id: 7, situation: 'Disagreeing in a group meeting', suds: 70, practiced: false, scenarioId: 'rohit' },
+    { id: 8, situation: 'Asking a friend for emotional support', suds: 75, practiced: false, scenarioId: 'rahul' },
+    { id: 9, situation: 'Defending my work to a senior person', suds: 80, practiced: false, scenarioId: 'kavitha' },
+    { id: 10, situation: 'Setting a boundary with a parent', suds: 90, practiced: false, scenarioId: 'sunita' },
   ],
 
   addFearItem: (item) => set(state => ({
