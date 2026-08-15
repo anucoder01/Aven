@@ -20,43 +20,55 @@ export function useVoiceBiomarkers({ isVoiceMode, sessionId, userId = 'test_user
           streamRef.current = stream;
           // Use webm as it is the standard for MediaRecorder in most browsers
           const options = { mimeType: 'audio/webm' };
-          const recorder = new MediaRecorder(stream, options);
-          mediaRecorderRef.current = recorder;
+          const startChunking = () => {
+            if (!active) return;
+            const recorder = new MediaRecorder(stream, options);
+            mediaRecorderRef.current = recorder;
 
-          recorder.ondataavailable = async (e) => {
-            if (e.data && e.data.size > 0) {
-              // Send the chunk to the backend
-              const formData = new FormData();
-              formData.append('audio', e.data, 'chunk.webm');
-              formData.append('session_id', String(sessionId));
-              formData.append('user_id', String(userId));
+            recorder.ondataavailable = async (e) => {
+              if (e.data && e.data.size > 0) {
+                // Send the chunk to the backend
+                const formData = new FormData();
+                formData.append('audio', e.data, 'chunk.webm');
+                formData.append('session_id', String(sessionId));
+                formData.append('user_id', String(userId));
 
-              try {
-                const response = await fetch('http://localhost:8000/biomarker/voice', {
-                  method: 'POST',
-                  body: formData,
-                });
-                
-                if (response.ok) {
-                  const result = await response.json();
-                  console.log('Voice biomarker extracted:', result);
-                  if (result.is_spike) {
-                    addSpikeEvent({
-                      type: 'voice',
-                      reason: result.spike_reason,
-                      jitter: result.jitter_pct,
-                      timestamp: new Date().toISOString()
-                    });
+                try {
+                  const response = await fetch('http://localhost:8000/biomarker/voice', {
+                    method: 'POST',
+                    body: formData,
+                  });
+                  
+                  if (response.ok) {
+                    const result = await response.json();
+                    console.log('Voice biomarker extracted:', result);
+                    if (result.is_spike) {
+                      addSpikeEvent({
+                        type: 'voice',
+                        reason: result.spike_reason,
+                        jitter: result.jitter_pct,
+                        timestamp: new Date().toISOString()
+                      });
+                    }
+                  } else {
+                    console.warn('Voice biomarker analysis failed:', response.status);
                   }
+                } catch (err) {
+                  console.error("Failed to upload voice chunk for biomarker analysis:", err);
                 }
-              } catch (err) {
-                console.error("Failed to upload voice chunk for biomarker analysis:", err);
               }
-            }
+            };
+
+            recorder.start();
+            setTimeout(() => {
+              if (active && recorder.state === 'recording') {
+                recorder.stop();
+                startChunking();
+              }
+            }, 6000);
           };
 
-          // Capture a chunk every 6 seconds
-          recorder.start(6000);
+          startChunking();
         })
         .catch((err) => {
           console.warn('Microphone permission denied or unavailable for voice biomarkers:', err);
