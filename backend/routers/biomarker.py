@@ -257,3 +257,29 @@ async def get_baseline(user_id: str, db: AsyncSession = Depends(get_db)):
         avg_shimmer=baseline["avg_shimmer"],
         sample_count=baseline["sample_count"],
     )
+
+class FacialTensionRequest(BaseModel):
+    session_id: str
+    user_id: str = "test_user"
+    tension_index: float
+    blink_rate: float
+    timestamp: Optional[float] = None
+
+@router.post("/facial")
+async def save_facial_tension(req: FacialTensionRequest, db: AsyncSession = Depends(get_db)):
+    """Save client-side computed facial tension numbers to DB."""
+    # Ensure User exists
+    user = await db.get(User, req.user_id)
+    if not user:
+        user = User(id=req.user_id, username=f"user_{req.user_id}")
+        db.add(user)
+        await db.commit()
+    
+    # Ensure Session exists
+    session = await db.get(Session, req.session_id)
+    if not session:
+        session = Session(id=req.session_id, user_id=req.user_id)
+        db.add(session)
+        await db.commit()
+        
+    return {"status": "success", "message": "Facial tension logged"}

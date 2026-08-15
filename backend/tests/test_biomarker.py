@@ -1,54 +1,56 @@
 import os
-import wave
-import struct
-import math
-import tempfile
 import pytest
 from fastapi.testclient import TestClient
+from unittest.mock import AsyncMock, MagicMock
 
-# Create a minimal app mock or import main
 from main import app
+from database import get_db
+
+async def override_get_db():
+    mock_session = AsyncMock()
+    # Mock return values for db.get and db.execute
+    mock_session.get.return_value = True # mock user/session existence
+    
+    mock_result = MagicMock()
+    mock_result.scalars.return_value.all.return_value = []
+    mock_session.execute.return_value = mock_result
+    
+    yield mock_session
+
+app.dependency_overrides[get_db] = override_get_db
 
 client = TestClient(app)
 
-def generate_mock_wav(filename, freq=200.0, duration=2.0, sample_rate=44100):
-    """Generate a simple sine wave to mimic a vocal pitch for testing."""
-    obj = wave.open(filename, 'w')
-    obj.setnchannels(1) # mono
-    obj.setsampwidth(2)
-    obj.setframerate(sample_rate)
+def test_voice_biomarker_calm_vs_tense():
+    # Use real audio files instead of synthetic waves
+    tests_dir = os.path.dirname(__file__)
+    calm_file = os.path.join(tests_dir, "calm_voice.wav")
+    tense_file = os.path.join(tests_dir, "tense_voice.wav")
     
-    for i in range(int(duration * sample_rate)):
-        value = int(32767.0 * math.sin(2.0 * math.pi * freq * i / sample_rate))
-        data = struct.pack('<h', value)
-        obj.writeframesraw(data)
-    obj.close()
-
-@pytest.fixture
-def mock_audio_file():
-    fd, path = tempfile.mkstemp(suffix='.wav')
-    os.close(fd)
-    generate_mock_wav(path, freq=150.0) # 150 Hz
-    yield path
-    os.unlink(path)
-
-def test_voice_biomarker_endpoint(mock_audio_file):
-    with open(mock_audio_file, 'rb') as f:
-        response = client.post(
+    # 1. Test calm voice
+    with open(calm_file, 'rb') as f:
+        calm_resp = client.post(
             "/biomarker/voice",
-            data={"session_id": "test_session_1"},
-            files={"audio": ("test.wav", f, "audio/wav")}
+            data={"session_id": "test_session_calm", "user_id": "test_user"},
+            files={"audio": ("calm.wav", f, "audio/wav")}
         )
+    assert calm_resp.status_code == 200
+    calm_data = calm_resp.json()
     
-    assert response.status_code == 200
-    data = response.json()
-    assert data["status"] == "success"
-    assert "pitch_hz" in data["data"]
-    assert "jitter_pct" in data["data"]
-    
-    # Check plausible range for the synthetic 150Hz tone
-    pitch = data["data"]["pitch_hz"]
-    assert 140.0 < pitch < 160.0
+    # 2. Test tense voice
+    with open(tense_file, 'rb') as f:
+        tense_resp = client.post(
+            "/biomarker/voice",
+            data={"session_id": "test_session_tense", "user_id": "test_user"},
+            files={"audio": ("tense.wav", f, "audio/wav")}
+        )
+    assert tense_resp.status_code == 200
+    tense_data = tense_resp.json()
+
+    # Assert that tense voice shows higher jitter and shimmer
+    # as described in integration notes: "10x higher jitter" and "7x higher shimmer"
+    assert tense_data["jitter_pct"] > calm_data["jitter_pct"]
+    assert tense_data["shimmer_pct"] > calm_data["shimmer_pct"]
 
 def test_facial_tension_endpoint():
     response = client.post(
