@@ -291,9 +291,16 @@ export default function SessionPage() {
   }, [messages, isCharacterTyping])
 
   const handleSend = useCallback(async (text) => {
-    if (!text.trim() || sessionEnded) return
+    if (!text.trim() || sessionEnded || isCharacterTyping) return
     const userText = text.trim()
     setInputText('')
+
+    // Stop recording immediately if user sends via voice to prevent echo/double sends
+    if (isRecording) {
+      recognitionRef.current?.stop()
+      setRecording(false)
+      setOrbState('idle')
+    }
 
     // Add user message
     const msgId = Date.now()
@@ -448,7 +455,7 @@ export default function SessionPage() {
 
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition
     const recognition = new SpeechRecognition()
-    recognition.continuous = true
+    recognition.continuous = false
     recognition.interimResults = false
     recognition.lang = 'en-US'
 
