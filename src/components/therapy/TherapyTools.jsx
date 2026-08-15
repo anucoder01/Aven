@@ -1,10 +1,61 @@
 import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Plus, Trash2, ChevronRight, Check, ExternalLink, Brain, MessageSquare, FlaskConical, Eye } from 'lucide-react'
+import { Plus, Trash2, ChevronRight, Check, ExternalLink, Brain, MessageSquare, FlaskConical, Eye, Info, X } from 'lucide-react'
 import { useTherapyStore } from '../../store/therapyStore'
 import { useSessionStore } from '../../store/sessionStore'
 import { DISTORTION_LABELS } from '../../data/scenarios'
 import { useNavigate } from 'react-router-dom'
+
+// ══════════════════════════════════════════
+//  FEATURE HEADER (WITH INFO TOOLTIP)
+// ══════════════════════════════════════════
+function FeatureHeader({ title, subtitle, description, steps, children }) {
+  const [infoOpen, setInfoOpen] = useState(false)
+  return (
+    <div className="mb-2">
+      <div className="flex items-start justify-between flex-wrap gap-3">
+        <div>
+          <h2 className="font-semibold text-text-primary flex items-center">
+            {title}
+            <button onClick={() => setInfoOpen(!infoOpen)} className="text-text-muted hover:text-teal-400 transition-colors ml-2" title="How to use">
+              <Info size={14} />
+            </button>
+          </h2>
+          {subtitle && <p className="text-xs text-text-muted mt-0.5">{subtitle}</p>}
+        </div>
+        {children && (
+          <div className="flex gap-2 flex-shrink-0">
+            {children}
+          </div>
+        )}
+      </div>
+      
+      <AnimatePresence>
+        {infoOpen && (
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: 'auto' }}
+            exit={{ opacity: 0, height: 0 }}
+            className="overflow-hidden"
+          >
+            <div className="glass-teal rounded-xl p-4 mt-4 text-sm text-teal-100/90 space-y-2 relative border border-teal-400/20">
+              <button onClick={() => setInfoOpen(false)} className="absolute top-3 right-3 text-teal-400 hover:text-teal-300">
+                <X size={14} />
+              </button>
+              <h4 className="font-semibold text-teal-400 mb-1 pr-6">How to use {title}</h4>
+              <p className="text-xs leading-relaxed">{description}</p>
+              {steps && (
+                <ol className="list-decimal pl-4 space-y-1 mt-2 text-xs">
+                  {steps.map((step, i) => <li key={i}>{step}</li>)}
+                </ol>
+              )}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  )
+}
 
 // ══════════════════════════════════════════
 //  TAB 1: THOUGHT RECORDS
@@ -98,22 +149,26 @@ export function ThoughtRecordTab() {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="font-semibold text-text-primary">Thought Records</h2>
-          <p className="text-xs text-text-muted mt-0.5">The most-assigned CBT homework — digitized and auto-populated from your sessions.</p>
-        </div>
-        <div className="flex gap-2">
-          {distortionEvents.length > 0 && (
-            <button onClick={createFromSession} className="btn-ghost text-xs py-1.5 px-3">
-              <Brain size={11} /> From Session
-            </button>
-          )}
-          <button onClick={() => { setEditing({}); setCreating(true) }} className="btn-primary text-xs py-1.5 px-3">
-            <Plus size={11} /> New Record
+      <FeatureHeader 
+        title="Thought Records"
+        subtitle="The most-assigned CBT homework — digitized and auto-populated from your sessions."
+        description="A core CBT technique to identify and challenge irrational thoughts (cognitive distortions)."
+        steps={[
+          "Notice when you feel a sudden negative emotion or anxiety spike.",
+          "Record the situation and your automatic thought.",
+          "List objective evidence that supports and contradicts this thought.",
+          "Write a more balanced, realistic perspective."
+        ]}
+      >
+        {distortionEvents.length > 0 && (
+          <button onClick={createFromSession} className="btn-ghost text-xs py-1.5 px-3">
+            <Brain size={11} /> From Session
           </button>
-        </div>
-      </div>
+        )}
+        <button onClick={() => { setEditing({}); setCreating(true) }} className="btn-primary text-xs py-1.5 px-3">
+          <Plus size={11} /> New Record
+        </button>
+      </FeatureHeader>
 
       <AnimatePresence>
         {(creating || editing?.id) && (
@@ -219,10 +274,16 @@ export function SocraticCoachTab() {
 
   return (
     <div className="space-y-4">
-      <div>
-        <h2 className="font-semibold text-text-primary">Socratic Questioning Coach</h2>
-        <p className="text-xs text-text-muted mt-0.5">Not telling you what to think — teaching you to question your own thoughts. The difference is everything.</p>
-      </div>
+      <FeatureHeader 
+        title="Socratic Questioning Coach"
+        subtitle="Not telling you what to think — teaching you to question your own thoughts. The difference is everything."
+        description="Instead of just telling you not to worry, this tool asks you targeted questions to help you reach a logical conclusion on your own."
+        steps={[
+          "Enter a negative thought that's bothering you.",
+          "The coach will ask you a series of questions.",
+          "Answer them honestly to examine your thought from multiple angles and defuse its emotional power."
+        ]}
+      />
 
       {!active ? (
         <div className="space-y-3">
@@ -356,15 +417,20 @@ export function FearHierarchyTab() {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="font-semibold text-text-primary">Fear Hierarchy</h2>
-          <p className="text-xs text-text-muted mt-0.5">Map every social situation on a 0–100 SUDS scale. Systematically conquer the list.</p>
-        </div>
+      <FeatureHeader 
+        title="Fear Hierarchy"
+        subtitle="Map every social situation on a 0–100 SUDS scale. Systematically conquer the list."
+        description="Systematic desensitization involves gradually facing your fears, starting from the easiest to the hardest."
+        steps={[
+          "Add situations that make you anxious and rate them from 0 to 100 on the SUDS (Subjective Units of Distress Scale).",
+          "Start practicing the easiest situations (lowest SUDS score) first.",
+          "Once a situation feels manageable, check it off and move to the next one!"
+        ]}
+      >
         <button onClick={() => setAdding(true)} className="btn-primary text-xs py-1.5 px-3">
           <Plus size={11} /> Add Situation
         </button>
-      </div>
+      </FeatureHeader>
 
       <div className="glass rounded-xl p-3 flex items-center gap-4">
         <div className="text-center">
@@ -489,15 +555,20 @@ export function BehavioralExperimentTab() {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="font-semibold text-text-primary">Behavioral Experiments</h2>
-          <p className="text-xs text-text-muted mt-0.5">Test your anxiety predictions against reality. You're almost always wrong about how bad it'll be.</p>
-        </div>
+      <FeatureHeader 
+        title="Behavioral Experiments"
+        subtitle="Test your anxiety predictions against reality. You're almost always wrong about how bad it'll be."
+        description="Anxiety tricks you into making catastrophic predictions. Behavioral experiments treat these predictions as hypotheses to test in the real world."
+        steps={[
+          "Write down exactly what you fear will happen (the prediction).",
+          "Do a practice session to actually test it (the action plan).",
+          "Record what actually happened and compare it to your prediction! Over time, you'll see your worst fears rarely come true."
+        ]}
+      >
         <button onClick={() => setCreating(true)} className="btn-primary text-xs py-1.5 px-3">
           <Plus size={11} /> New Experiment
         </button>
-      </div>
+      </FeatureHeader>
 
       {accuracy !== null && (
         <motion.div
@@ -628,10 +699,17 @@ export function ImageryRescriptingTab() {
 
   if (phase === 0) return (
     <div className="space-y-4">
-      <div>
-        <h2 className="font-semibold text-text-primary">Imagery Rescripting</h2>
-        <p className="text-xs text-text-muted mt-0.5">Replay your worst social memory — then rewrite how it ends. Clinically, this rewires the emotional charge. Effect sizes: d=0.9–1.2.</p>
-      </div>
+      <FeatureHeader 
+        title="Imagery Rescripting"
+        subtitle="Replay your worst social memory — then rewrite how it ends. Clinically, this rewires the emotional charge. Effect sizes: d=0.9–1.2."
+        description="A powerful technique to reduce the emotional pain of past traumatic or embarrassing memories by rewriting how they end."
+        steps={[
+          "Verify you are in a safe, calm state (distress below 7).",
+          "Write out the difficult memory in detail.",
+          "Reimagine the scene from the perspective of a compassionate bystander who intervenes or changes the outcome.",
+          "Re-read the new, safe ending to rewire the emotional charge of the memory."
+        ]}
+      />
 
       <div className="glass rounded-2xl p-6 space-y-5">
         <div className="flex items-start gap-3 p-3 rounded-xl bg-amber-400/[0.06] border border-amber-400/20">
