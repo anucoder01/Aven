@@ -74,7 +74,7 @@ export default function LandingPage() {
       // Check for standalone greetings or 'aven' using word boundaries
       const greetingRegex = /\b(hi|hello|hey|hola|sup|greetings|howdy|aven|even|heaven)\b/
       
-      let responseText = ""
+      let responseText;
       
       const hour = new Date().getHours()
       const isMorning = hour < 12

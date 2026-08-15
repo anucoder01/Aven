@@ -70,7 +70,7 @@ export function PatientDetailModal({ isOpen, onClose, patient, reports }) {
                   </div>
 
                   <div className="text-xs text-text-secondary leading-relaxed">
-                    <span className="font-semibold text-text-primary">Summary:</span> {report.overall_summary || "No summary available."}
+                    <span className="font-semibold text-text-primary">Summary:</span> {report.session_insights || report.overall_summary || "No summary available."}
                   </div>
                 </div>
               ))

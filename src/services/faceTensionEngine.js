@@ -25,9 +25,9 @@ class FaceTensionEngine {
         numFaces: 1
       });
       console.log("FaceLandmarker initialized successfully.");
-    } catch (err) {
-      console.error("Failed to initialize FaceLandmarker:", err);
-    } finally {
+      } catch {
+        console.warn("FaceLandmarker vision task failed to process frame");
+      } finally {
       this.isInitializing = false;
     }
   }
@@ -96,7 +96,7 @@ class FaceTensionEngine {
           raw: { avgBrowLower, avgLipPress, avgSquint }
         };
       }
-    } catch (err) {
+    } catch {
       // Ignore occasional video processing errors
     }
     return null;

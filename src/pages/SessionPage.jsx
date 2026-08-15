@@ -188,7 +188,6 @@ export default function SessionPage() {
   const animRef = useRef(null)
 
   const [consentState, setConsentState] = useState(null)
-  const [facialTension, setFacialTension] = useState(null)
   const [dominantEmotion, setDominantEmotion] = useState(null)
 
   // Capture voice biomarkers using MediaRecorder continuously while in voice mode
@@ -402,7 +401,7 @@ export default function SessionPage() {
                     if (data.delta) {
                       aiResponse += data.delta
                     }
-                  } catch (parseError) {
+                  } catch {
                     console.warn("Failed to parse SSE data chunk:", trimmed)
                   }
                 }
@@ -504,21 +503,21 @@ export default function SessionPage() {
   useEffect(() => {
     if (consentState === 'accepted') {
       let isRunning = true
+      const videoElement = videoRef.current
       navigator.mediaDevices.getUserMedia({ video: true }).then(stream => {
-        if (!videoRef.current) return
-        videoRef.current.srcObject = stream
-        videoRef.current.play()
+        if (!videoElement) return
+        videoElement.srcObject = stream
+        videoElement.play()
 
         let lastProcessTime = 0
         const loop = async (now) => {
           if (!isRunning) return
-          if (videoRef.current && videoRef.current.readyState >= 2) {
+          if (videoElement && videoElement.readyState >= 2) {
             // Limit to ~5 FPS (every 200ms)
             if (now - lastProcessTime > 200) {
               lastProcessTime = now
-              const result = await faceTensionEngine.predictVideo(videoRef.current, performance.now())
+              const result = await faceTensionEngine.predictVideo(videoElement, performance.now())
               if (result) {
-                setFacialTension(result.tensionIndex)
                 if (result.dominantEmotion) {
                   setDominantEmotion(result.dominantEmotion)
                 }
@@ -553,12 +552,12 @@ export default function SessionPage() {
       return () => {
         isRunning = false
         cancelAnimationFrame(animRef.current)
-        if (videoRef.current && videoRef.current.srcObject) {
-          videoRef.current.srcObject.getTracks().forEach(t => t.stop())
+        if (videoElement && videoElement.srcObject) {
+          videoElement.srcObject.getTracks().forEach(t => t.stop())
         }
       }
     }
-  }, [consentState])
+  }, [consentState, scenarioId])
 
   return (
     <div className="h-screen flex flex-col relative overflow-hidden" style={{ background: '#07071a' }}>

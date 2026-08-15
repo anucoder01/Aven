@@ -17,7 +17,7 @@ export function PatientList() {
   }
 
   // Calculate trend
-  let progress = "neutral"
+  let progress;
   if (totalScenarios >= 2) {
     const recent = completedReports.slice(-2)
     const recentSuds = recent[1].suds || recent[1].suds_score || 0
