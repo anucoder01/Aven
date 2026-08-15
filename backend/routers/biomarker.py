@@ -264,10 +264,19 @@ class FacialTensionRequest(BaseModel):
     tension_index: float
     blink_rate: float
     timestamp: Optional[float] = None
+    emotion_happy: Optional[float] = None
+    emotion_sad: Optional[float] = None
+    emotion_angry: Optional[float] = None
+    emotion_fear: Optional[float] = None
+    emotion_surprise: Optional[float] = None
+    emotion_disgust: Optional[float] = None
+    dominant_emotion: Optional[str] = None
 
 @router.post("/facial")
 async def save_facial_tension(req: FacialTensionRequest, db: AsyncSession = Depends(get_db)):
-    """Save client-side computed facial tension numbers to DB."""
+    """Save client-side computed facial tension and emotions to DB."""
+    from models import FacialTensionSample  # Ensure it's imported
+    
     # Ensure User exists
     user = await db.get(User, req.user_id)
     if not user:
@@ -282,4 +291,20 @@ async def save_facial_tension(req: FacialTensionRequest, db: AsyncSession = Depe
         db.add(session)
         await db.commit()
         
-    return {"status": "success", "message": "Facial tension logged"}
+    # Save the sample
+    sample = FacialTensionSample(
+        session_id=req.session_id,
+        tension_index=req.tension_index,
+        blink_rate=req.blink_rate,
+        emotion_happy=req.emotion_happy,
+        emotion_sad=req.emotion_sad,
+        emotion_angry=req.emotion_angry,
+        emotion_fear=req.emotion_fear,
+        emotion_surprise=req.emotion_surprise,
+        emotion_disgust=req.emotion_disgust,
+        dominant_emotion=req.dominant_emotion
+    )
+    db.add(sample)
+    await db.commit()
+        
+    return {"status": "success", "message": "Facial tension and emotions logged"}

@@ -70,7 +70,7 @@ function ChatBubble({ message }) {
   )
 }
 
-function LiveStatsPanel({ stats }) {
+function LiveStatsPanel({ stats, dominantEmotion }) {
   const { spikeEvents, getLatestCheckIn } = useBodyStore()
   const preSession = getLatestCheckIn('pre')
   const suds = preSession ? preSession.suds : 5
@@ -131,6 +131,12 @@ function LiveStatsPanel({ stats }) {
               {hasSpikes ? "Elevated" : "Calm"}
             </span>
           </div>
+          {dominantEmotion && (
+            <div className="flex items-center justify-between text-xs pt-1 border-t border-white/[0.04]">
+              <span className="text-text-secondary">Primary Emotion</span>
+              <span className="text-teal-400 font-bold capitalize">{dominantEmotion}</span>
+            </div>
+          )}
           {hasSpikes && suds < 4 && (
             <div className="text-[10px] text-amber-400/80 bg-amber-400/10 p-2 rounded-lg mt-2">
               <AlertTriangle size={10} className="inline mr-1" />
@@ -183,6 +189,7 @@ export default function SessionPage() {
 
   const [consentState, setConsentState] = useState(null)
   const [facialTension, setFacialTension] = useState(null)
+  const [dominantEmotion, setDominantEmotion] = useState(null)
 
   // Capture voice biomarkers using MediaRecorder continuously while in voice mode
   useVoiceBiomarkers({ isVoiceMode, sessionId: scenarioId, userId: 'test_user' })
@@ -512,6 +519,10 @@ export default function SessionPage() {
               const result = await faceTensionEngine.predictVideo(videoRef.current, performance.now())
               if (result) {
                 setFacialTension(result.tensionIndex)
+                if (result.dominantEmotion) {
+                  setDominantEmotion(result.dominantEmotion)
+                }
+                
                 fetch('http://localhost:8000/biomarker/facial', {
                   method: 'POST',
                   headers: { 'Content-Type': 'application/json' },
@@ -519,7 +530,14 @@ export default function SessionPage() {
                     session_id: String(scenarioId),
                     user_id: 'test_user',
                     tension_index: result.tensionIndex,
-                    blink_rate: result.blinkRate
+                    blink_rate: result.blinkRate,
+                    emotion_happy: result.emotions?.happy,
+                    emotion_sad: result.emotions?.sad,
+                    emotion_angry: result.emotions?.angry,
+                    emotion_fear: result.emotions?.fear,
+                    emotion_surprise: result.emotions?.surprise,
+                    emotion_disgust: result.emotions?.disgust,
+                    dominant_emotion: result.dominantEmotion
                   })
                 }).catch(e => console.warn("Facial tracking post failed", e))
               }
@@ -707,7 +725,7 @@ export default function SessionPage() {
 
         {/* Right: Live stats */}
         <div className="hidden xl:flex flex-col w-52 flex-shrink-0">
-          <LiveStatsPanel stats={liveStats} />
+          <LiveStatsPanel stats={liveStats} dominantEmotion={dominantEmotion} />
         </div>
       </div>
     </div>

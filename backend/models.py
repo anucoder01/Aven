@@ -41,6 +41,17 @@ class FacialTensionSample(Base):
     tension_index = Column(Float, nullable=True)
     blink_rate = Column(Float, nullable=True)
     
+    # Emotion scores (0.0 to 1.0)
+    emotion_happy = Column(Float, nullable=True)
+    emotion_sad = Column(Float, nullable=True)
+    emotion_angry = Column(Float, nullable=True)
+    emotion_fear = Column(Float, nullable=True)
+    emotion_surprise = Column(Float, nullable=True)
+    emotion_disgust = Column(Float, nullable=True)
+    
+    # The primary emotion detected
+    dominant_emotion = Column(String, nullable=True)
+    
     session = relationship("Session", back_populates="facial_samples")
 
 class BiomarkerBaseline(Base):

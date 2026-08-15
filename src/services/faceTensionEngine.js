@@ -70,9 +70,29 @@ class FaceTensionEngine {
         // Weighted tension index (0 to 1 range approx)
         const tensionIndex = (avgBrowLower * 0.4) + (avgLipPress * 0.3) + (avgSquint * 0.3);
 
+        // Emotion Action Unit Mappings
+        const happy = (getScore("mouthSmileLeft") + getScore("mouthSmileRight")) / 2;
+        const sad = (getScore("browDownLeft") + getScore("browDownRight") + getScore("mouthFrownLeft") + getScore("mouthFrownRight") + getScore("browInnerUp")) / 5;
+        const angry = (getScore("browDownLeft") + getScore("browDownRight") + getScore("mouthPressLeft") + getScore("mouthPressRight") + getScore("eyeSquintLeft") + getScore("eyeSquintRight")) / 6;
+        const surprise = (getScore("browInnerUp") + getScore("browOuterUpLeft") + getScore("browOuterUpRight") + getScore("jawOpen")) / 4;
+        const fear = (getScore("browInnerUp") + getScore("eyeWideLeft") + getScore("eyeWideRight") + getScore("mouthStretchLeft") + getScore("mouthStretchRight")) / 5;
+        const disgust = (getScore("noseSneerLeft") + getScore("noseSneerRight") + getScore("mouthUpperUpLeft") + getScore("mouthUpperUpRight")) / 4;
+
+        const emotions = { happy, sad, angry, surprise, fear, disgust, neutral: 0.1 };
+        let dominantEmotion = "neutral";
+        let maxScore = 0.1;
+        for (const [emo, score] of Object.entries(emotions)) {
+          if (score > maxScore) {
+            maxScore = score;
+            dominantEmotion = emo;
+          }
+        }
+
         return {
           tensionIndex: tensionIndex,
           blinkRate: avgBlink, 
+          emotions: { happy, sad, angry, surprise, fear, disgust },
+          dominantEmotion,
           raw: { avgBrowLower, avgLipPress, avgSquint }
         };
       }
