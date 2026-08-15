@@ -137,17 +137,41 @@ IMPORTANT:
 
 async def generate_mock_report(transcript, distortion_events):
     """Returns mock report structure for development without API key."""
+    total = 0
+    dist_counts = {}
+    
+    for evt in distortion_events:
+        for d in evt.get("distortions", []):
+            k = d.get("key")
+            if k not in dist_counts:
+                dist_counts[k] = {"key": k, "label": d.get("label", k), "count": 0, "sev_sum": 0, "quotes": []}
+            dist_counts[k]["count"] += 1
+            dist_counts[k]["sev_sum"] += d.get("severity", 1)
+            dist_counts[k]["quotes"].append({
+                "text": evt.get("message", "Unknown message"),
+                "severity": d.get("severity", 1),
+                "reframe": f"Try to view this from a more balanced perspective instead of {str(d.get('label') or 'this distortion').lower()}."
+            })
+            total += 1
+            
+    top_distortions = []
+    for k, v in dist_counts.items():
+        v["avg_severity"] = v["sev_sum"] / v["count"]
+        top_distortions.append(v)
+        
+    top_distortions.sort(key=lambda x: x["count"], reverse=True)
+
     return {
-        "assertiveness_score": 4,
-        "assertiveness_rationale": "You communicated your ideas but frequently hedged and apologized unnecessarily. You stayed in the conversation which shows courage.",
-        "session_insights": "Your main pattern was catastrophizing — assuming worst-case outcomes from ambiguous signals. The character's directness triggered mind-reading in you, leading you to assume negative judgments without evidence.",
-        "growth_note": "You held your position longer before deflecting compared to an average first session.",
-        "top_distortions": [],
-        "avoidance_summary": "You deflected 2 times and over-apologized once. Avoidance is protective but prevents you from getting your needs met.",
+        "assertiveness_score": 6 if total < 3 else 4,
+        "assertiveness_rationale": "You stayed in the conversation which shows courage, though there's room to challenge automatic thoughts.",
+        "session_insights": f"During this session, {total} cognitive distortions were detected. Identifying these is the first step toward restructuring them.",
+        "growth_note": "You are making progress by simply bringing awareness to these patterns.",
+        "top_distortions": top_distortions,
+        "avoidance_summary": "No major avoidance detected, though keep an eye on deflecting or over-apologizing.",
         "three_action_steps": [
-            "Before your next session, practice one sentence that states your position clearly without 'maybe' or 'I guess'.",
-            "When you feel the urge to apologize, pause — ask yourself: 'Did I actually do something wrong?'",
-            "Try the evidence-checking technique: list one fact that supports your catastrophic prediction, then one fact against it.",
+            "Review the specific quotes flagged in this report.",
+            "Try generating your own reframes for those thoughts.",
+            "Practice the same scenario again focusing on one specific distortion to avoid.",
         ],
     }
 
@@ -243,22 +267,34 @@ async def generate_report(req: ReportRequest):
     ])
     distortion_summary = json.dumps(req.distortion_events, indent=2)
 
-    # Note: we are currently using OpenAI, Groq, or Ollama for JSON report generation
-    if not client or provider not in ["openai", "groq", "ollama"]:
+    # Note: we are currently using OpenAI, Groq, Ollama, or Gemini for JSON report generation
+    if not client or provider not in ["openai", "groq", "ollama", "gemini"]:
         return await generate_mock_report(req.transcript, req.distortion_events)
 
     try:
-        model_name = OLLAMA_MODEL if provider == "ollama" else ("llama-3.3-70b-versatile" if provider == "groq" else "gpt-4o")
-        response = await client.chat.completions.create(
-            model=model_name,
-            messages=[
-                {"role": "system", "content": CBT_REPORT_PROMPT},
-                {"role": "user", "content": f"TRANSCRIPT:\n{transcript_text}\n\nDISTORTION EVENTS:\n{distortion_summary}"},
-            ],
-            temperature=0.3,
-            response_format={"type": "json_object"},
-        )
-        raw_text = response.choices[0].message.content
+        if provider == "gemini":
+            import google.generativeai as genai
+            model = genai.GenerativeModel(
+                model_name="gemini-1.5-pro",
+                system_instruction=CBT_REPORT_PROMPT
+            )
+            response = model.generate_content(
+                f"TRANSCRIPT:\n{transcript_text}\n\nDISTORTION EVENTS:\n{distortion_summary}",
+                generation_config={"temperature": 0.3, "response_mime_type": "application/json"}
+            )
+            raw_text = response.text
+        else:
+            model_name = OLLAMA_MODEL if provider == "ollama" else ("llama-3.3-70b-versatile" if provider == "groq" else "gpt-4o")
+            response = await client.chat.completions.create(
+                model=model_name,
+                messages=[
+                    {"role": "system", "content": CBT_REPORT_PROMPT},
+                    {"role": "user", "content": f"TRANSCRIPT:\n{transcript_text}\n\nDISTORTION EVENTS:\n{distortion_summary}"},
+                ],
+                temperature=0.3,
+                response_format={"type": "json_object"},
+            )
+            raw_text = response.choices[0].message.content
         
         # Clean up markdown code blocks if the model mistakenly included them
         clean_text = raw_text.strip()
