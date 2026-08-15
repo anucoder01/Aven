@@ -42,7 +42,7 @@ export function evaluateCompetency(sessionReport) {
 }
 
 // Determines the maximum unlocked level for a scenario given the user's progress history
-export function getMaxUnlockedLevel(scenarioId, sessionHistory) {
+export function getMaxUnlockedLevel() {
   // Overridden: Levels are no longer locked based on progression.
   // Users can pick and choose any difficulty level up to 5.
   return 5;
