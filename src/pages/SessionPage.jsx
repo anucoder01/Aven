@@ -229,7 +229,7 @@ export default function SessionPage() {
           body: JSON.stringify({
             system_prompt: sysPrompt,
             messages: [],
-            stream: false,
+            stream: true,
             difficulty_level: level.level
           })
         })
@@ -359,7 +359,7 @@ export default function SessionPage() {
         body: JSON.stringify({
           system_prompt: sysPrompt,
           messages: recentMessages,
-          stream: false,
+          stream: true,
           difficulty_level: level.level
         })
       })
