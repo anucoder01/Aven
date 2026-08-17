@@ -17,21 +17,46 @@ load_dotenv()
 import httpx
 
 try:
-    from openai import AsyncOpenAI
+    from openai import (
+        AsyncOpenAI,
+        APIConnectionError,
+        AuthenticationError,
+        NotFoundError,
+        APIStatusError,
+        APIError
+    )
     HAS_OPENAI = True
 except ImportError:
     HAS_OPENAI = False
+    APIConnectionError = AuthenticationError = NotFoundError = APIStatusError = APIError = Exception
 
-try:
-    import google.generativeai as genai
-    HAS_GEMINI = True
-except ImportError:
-    HAS_GEMINI = False
+import warnings
+with warnings.catch_warnings():
+    warnings.simplefilter("ignore")
+    try:
+        import google.generativeai as genai
+        HAS_GEMINI = True
+    except ImportError:
+        HAS_GEMINI = False
 
 router = APIRouter()
 
-OLLAMA_BASE_URL = os.environ.get("OLLAMA_BASE_URL", "http://localhost:11434")
-OLLAMA_MODEL = os.environ.get("OLLAMA_MODEL", "llama3.1:8b")
+from config import settings
+
+OLLAMA_BASE_URL = os.environ.get("OLLAMA_BASE_URL", getattr(settings, "ollama_base_url", "http://localhost:11434"))
+OLLAMA_MODEL = os.environ.get("OLLAMA_MODEL", getattr(settings, "ollama_model", "llama3.1:8b"))
+GROQ_MODEL = os.environ.get("GROQ_MODEL", getattr(settings, "groq_model", "groq/compound"))
+GROQ_FALLBACK_MODELS = [GROQ_MODEL, "llama-3.3-70b-versatile", "llama3-8b-8192", "groq/compound"]
+
+def get_model_name(provider: str) -> str:
+    if provider == "ollama":
+        return OLLAMA_MODEL
+    elif provider == "groq":
+        return GROQ_MODEL
+    elif provider == "gemini":
+        return os.environ.get("GEMINI_MODEL", "gemini-1.5-flash")
+    else:
+        return os.environ.get("OPENAI_MODEL", "gpt-4o")
 
 def _ollama_is_running(timeout_seconds: float = 1.0) -> bool:
     try:
@@ -74,8 +99,8 @@ def get_llm_client():
 
 
 class Message(BaseModel):
-    role: str  # "user" | "assistant" | "system"
-    content: str
+    role: str = "user"  # "user" | "assistant" | "system" | "ai"
+    content: str = ""
 
 
 class CharacterRequest(BaseModel):
@@ -194,49 +219,96 @@ async def character_response(req: CharacterRequest):
 
     async def llm_stream():
         import asyncio
+        import re
         delay = 1.0 if req.difficulty_level <= 2 else (3.0 if req.difficulty_level == 3 else 4.5)
         await asyncio.sleep(delay)
 
+        system_instruction = req.system_prompt + "\n\nCRITICAL INSTRUCTION: Do NOT output any internal thoughts, reasoning steps, or <think> tags. Output ONLY your direct spoken dialogue in character."
+
         if provider in ["openai", "groq", "ollama"]:
-            messages = [{"role": "system", "content": req.system_prompt}]
+            messages = [{"role": "system", "content": system_instruction}]
+            formatted = []
             for m in req.messages:
-                # Map frontend 'ai' role to standard 'assistant' role
-                role = "assistant" if m.role == "ai" else m.role
-                messages.append({"role": role, "content": m.content})
+                role = "assistant" if m.role in ["ai", "assistant"] else "user"
+                formatted.append({"role": role, "content": m.content})
+
+            if not formatted:
+                messages.append({"role": "user", "content": "Hello. Start the interaction in character."})
+            else:
+                if formatted[0]["role"] == "assistant":
+                    messages.append({"role": "user", "content": "Hello."})
+                messages.extend(formatted)
+                if messages[-1]["role"] != "user":
+                    messages.append({"role": "user", "content": "Continue in character."})
             
-            model_name = OLLAMA_MODEL if provider == "ollama" else ("llama-3.3-70b-versatile" if provider == "groq" else "gpt-4o")
-            
-            try:
-                stream = await client.chat.completions.create(
-                    model=model_name,
-                    messages=messages,
-                    max_tokens=250,
-                    temperature=0.85,
-                    stream=True
-                )
-                async for chunk in stream:
-                    if not chunk.choices:
+            candidate_models = GROQ_FALLBACK_MODELS if provider == "groq" else [get_model_name(provider)]
+            stream_success = False
+            last_error = None
+
+            for model_name in candidate_models:
+                try:
+                    stream = await client.chat.completions.create(
+                        model=model_name,
+                        messages=messages,
+                        max_tokens=250,
+                        temperature=0.85,
+                        stream=True
+                    )
+                    in_think_block = False
+                    think_buffer = ""
+                    async for chunk in stream:
+                        if not chunk.choices:
+                            continue
+                        delta = chunk.choices[0].delta.content or ""
+                        if not delta:
+                            continue
+
+                        # Buffer and discard <think>...</think> blocks from stream
+                        if "<think>" in delta or in_think_block:
+                            in_think_block = True
+                            think_buffer += delta
+                            if "</think>" in think_buffer:
+                                after_think = think_buffer.split("</think>", 1)[1]
+                                in_think_block = False
+                                think_buffer = ""
+                                if after_think:
+                                    yield f"data: {json.dumps({'delta': after_think})}\n\n"
+                            continue
+
+                        if delta:
+                            yield f"data: {json.dumps({'delta': delta})}\n\n"
+                    stream_success = True
+                    break
+                except Exception as e:
+                    last_error = e
+                    # If error is model not found or decommissioned, try next fallback
+                    err_str = str(e).lower()
+                    if "model_not_found" in err_str or "model_decommissioned" in err_str or "404" in err_str:
                         continue
-                    delta = chunk.choices[0].delta.content or ""
-                    if delta:
-                        yield f"data: {json.dumps({'delta': delta})}\n\n"
-            except Exception as e:
-                yield f"data: {json.dumps({'delta': f'[Error: {str(e)}]'})}\n\n"
+                    else:
+                        break
+
+            if not stream_success:
+                yield f"data: {json.dumps({'delta': f'[Error: {str(last_error)}]'})}\n\n"
             yield "data: [DONE]\n\n"
             
         elif provider == "gemini":
             # Set up Gemini
             import google.generativeai as genai
             model = genai.GenerativeModel(
-                model_name="gemini-1.5-pro",
+                model_name=os.environ.get("GEMINI_MODEL", "gemini-1.5-flash"),
                 system_instruction=req.system_prompt
             )
             
             chat_history = []
             for m in req.messages:
-                # Gemini roles are "user" and "model"
                 role = "user" if m.role == "user" else "model"
                 chat_history.append({"role": role, "parts": [m.content]})
+
+            if not chat_history:
+                chat_history.append({"role": "user", "parts": ["Hello. Start the interaction in character."]})
+            elif chat_history[0]["role"] == "model":
+                chat_history.insert(0, {"role": "user", "parts": ["Hello."]})
                 
             try:
                 # Stream the response
@@ -275,7 +347,7 @@ async def generate_report(req: ReportRequest):
         if provider == "gemini":
             import google.generativeai as genai
             model = genai.GenerativeModel(
-                model_name="gemini-1.5-pro",
+                model_name=os.environ.get("GEMINI_MODEL", "gemini-1.5-flash"),
                 system_instruction=CBT_REPORT_PROMPT
             )
             response = model.generate_content(
@@ -284,17 +356,32 @@ async def generate_report(req: ReportRequest):
             )
             raw_text = response.text
         else:
-            model_name = OLLAMA_MODEL if provider == "ollama" else ("llama-3.3-70b-versatile" if provider == "groq" else "gpt-4o")
-            response = await client.chat.completions.create(
-                model=model_name,
-                messages=[
-                    {"role": "system", "content": CBT_REPORT_PROMPT},
-                    {"role": "user", "content": f"TRANSCRIPT:\n{transcript_text}\n\nDISTORTION EVENTS:\n{distortion_summary}"},
-                ],
-                temperature=0.3,
-                response_format={"type": "json_object"},
-            )
-            raw_text = response.choices[0].message.content
+            candidate_models = GROQ_FALLBACK_MODELS if provider == "groq" else [get_model_name(provider)]
+            raw_text = None
+            last_error = None
+            for model_name in candidate_models:
+                try:
+                    response = await client.chat.completions.create(
+                        model=model_name,
+                        messages=[
+                            {"role": "system", "content": CBT_REPORT_PROMPT},
+                            {"role": "user", "content": f"TRANSCRIPT:\n{transcript_text}\n\nDISTORTION EVENTS:\n{distortion_summary}"},
+                        ],
+                        temperature=0.3,
+                        response_format={"type": "json_object"},
+                    )
+                    raw_text = response.choices[0].message.content
+                    break
+                except Exception as e:
+                    last_error = e
+                    err_str = str(e).lower()
+                    if "model_not_found" in err_str or "model_decommissioned" in err_str or "404" in err_str:
+                        continue
+                    else:
+                        break
+
+            if raw_text is None:
+                raise last_error or Exception("All candidate models failed")
         
         # Clean up markdown code blocks if the model mistakenly included them
         clean_text = raw_text.strip()
@@ -312,8 +399,8 @@ async def generate_report(req: ReportRequest):
             
         return json.loads(clean_text)
     except Exception as e:
-        print(f"Error generating report: {e}\nRaw Output: {response.choices[0].message.content if 'response' in locals() else 'None'}")
-        return {"error": f"LLM failed to produce valid JSON: {str(e)}", "raw_output": response.choices[0].message.content if 'response' in locals() else 'None'}
+        print(f"Error generating report: {e}\nRaw Output: {response.choices[0].message.content if 'response' in locals() and response else 'None'}")
+        return {"error": f"LLM failed to produce valid JSON: {str(e)}", "raw_output": response.choices[0].message.content if 'response' in locals() and response else 'None'}
 
 
 @router.post("/generate-scenario")
@@ -376,16 +463,33 @@ async def generate_scenario(req: GenerateScenarioRequest):
     """
 
     try:
-        model_name = OLLAMA_MODEL if provider == "ollama" else ("llama-3.3-70b-versatile" if provider == "groq" else "gpt-4o")
-        response = await client.chat.completions.create(
-            model=model_name,
-            messages=[{"role": "system", "content": prompt_instructions}],
-            temperature=0.7,
-            response_format={"type": "json_object"}
-        )
-        data = json.loads(response.choices[0].message.content)
+        candidate_models = GROQ_FALLBACK_MODELS if provider == "groq" else [get_model_name(provider)]
+        data = None
+        last_error = None
+        for model_name in candidate_models:
+            try:
+                response = await client.chat.completions.create(
+                    model=model_name,
+                    messages=[{"role": "system", "content": prompt_instructions}],
+                    temperature=0.7,
+                    response_format={"type": "json_object"}
+                )
+                data = json.loads(response.choices[0].message.content)
+                break
+            except Exception as e:
+                last_error = e
+                err_str = str(e).lower()
+                if "model_not_found" in err_str or "model_decommissioned" in err_str or "404" in err_str:
+                    continue
+                else:
+                    break
+
+        if data is None:
+            raise last_error or Exception("All candidate models failed")
+
         return data
     except Exception as e:
         print(f"Error generating custom scenario: {e}")
         return {"error": str(e), "traceback": "Check backend logs"}
+
 
