@@ -53,10 +53,21 @@ app.include_router(therapist.router, prefix="/therapist", tags=["Therapist"])
 app.include_router(biomarker.router, prefix="/biomarker", tags=["Biomarker"])
 
 
+@app.get("/")
+async def root():
+    return {
+        "name": "Aven FastAPI Backend",
+        "status": "running",
+        "docs": "http://localhost:8080/docs",
+        "health": "http://localhost:8080/health"
+    }
+
+
 @app.get("/health")
 async def health():
     return {"status": "ok", "version": "1.0.0"}
 
 
 if __name__ == "__main__":
-    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
+    uvicorn.run("main:app", host="0.0.0.0", port=8080, reload=True)
+

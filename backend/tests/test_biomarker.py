@@ -8,6 +8,7 @@ from database import get_db
 
 async def override_get_db():
     mock_session = AsyncMock()
+    mock_session.add = MagicMock()
     # Mock return values for db.get and db.execute
     mock_session.get.return_value = True # mock user/session existence
     

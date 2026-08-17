@@ -70,7 +70,7 @@ cd backend
 pip install -r requirements.txt
 uvicorn main:app --reload
 ```
-*The backend will run on `http://localhost:8000`.*
+*The backend will run on `http://localhost:8080`.*
 
 ### 2. Start the Frontend (React + Vite)
 Open a second terminal in the root project folder (`Aven`), install dependencies, and start the development server:

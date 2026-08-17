@@ -1,7 +1,7 @@
 """
 Aven Config — Environment variables and settings
 """
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
@@ -17,6 +17,7 @@ class Settings(BaseSettings):
     elevenlabs_api_key: str = ""
     gemini_api_key: str = ""
     groq_api_key: str = ""
+    groq_model: str = "groq/compound"
     ollama_model: str = "llama3.1:8b"
     ollama_base_url: str = "http://localhost:11434"
 
@@ -28,8 +29,8 @@ class Settings(BaseSettings):
     secret_key: str = "change-me-in-production"
     debug: bool = True
 
-    class Config:
-        env_file = ".env"
+    model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
 
 settings = Settings()
+

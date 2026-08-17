@@ -11,7 +11,7 @@ async def main():
         }
         print("Sending request...")
         try:
-            async with client.stream("POST", "http://localhost:8000/llm/character", json=req, timeout=10.0) as response:
+            async with client.stream("POST", "http://localhost:8080/llm/character", json=req, timeout=10.0) as response:
                 print(f"Status: {response.status_code}")
                 async for line in response.aiter_lines():
                     print("Line:", line)
