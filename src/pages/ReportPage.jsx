@@ -8,6 +8,7 @@ import { useTherapyStore } from '../store/therapyStore'
 import { useUserStore } from '../store/userStore'
 import { DISTORTION_LABELS } from '../data/scenarios'
 import { Star } from 'lucide-react'
+import { API_BASE_URL } from '../config'
 
 function AssertivenessMeter({ score }) {
   const [displayed, setDisplayed] = useState(0)
@@ -212,7 +213,7 @@ export default function ReportPage() {
           difficulty_level: activeSession?.level?.level || 1
         }
         
-        const res = await fetch('http://localhost:8000/llm/report', {
+        const res = await fetch(`${API_BASE_URL}/llm/report`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload)

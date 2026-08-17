@@ -4,6 +4,7 @@ import { motion } from 'framer-motion'
 import { PlusCircle, User, Settings, Flag, BrainCircuit } from 'lucide-react'
 import AuroraBackground from '../components/3d/AuroraBackground'
 import { useUserStore } from '../store/userStore'
+import { API_BASE_URL } from '../config'
 
 export default function CustomScenarioBuilder() {
   const navigate = useNavigate()
@@ -26,7 +27,7 @@ export default function CustomScenarioBuilder() {
     
     try {
       try {
-        await fetch('http://localhost:8000/scenario/create', {
+        await fetch(`${API_BASE_URL}/scenario/create`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(formData)

@@ -8,7 +8,6 @@ const NAV_ITEMS = [
   { id: 'therapy',   label: 'Therapy Tools',  icon: Brain,      path: '/therapy',   description: 'CBT worksheets & exercises' },
   { id: 'body',      label: 'Body',           icon: HeartPulse, path: '/body',      description: 'Physiology & breathing' },
   { id: 'progress',  label: 'Progress',       icon: BarChart3,  path: '/dashboard', description: 'Trajectory & assessments' },
-  { id: 'insights',  label: 'Insights',       icon: Lightbulb,  path: '/insights',  description: 'Personal patterns & engine' },
   { id: 'builder',   label: 'Scenario Builder',icon: Dumbbell,   path: '/scenario-builder', description: 'Design custom exposure' },
   { id: 'therapist', label: 'Clinician Portal',icon: Users,      path: '/therapist-portal', description: 'Patient dashboard' },
   { id: 'safety',    label: 'Safety',         icon: Shield,     path: '/safety',    description: 'Crisis · therapist · limits' },

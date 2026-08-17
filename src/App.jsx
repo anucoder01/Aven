@@ -22,7 +22,6 @@ export default function App() {
         <Route path="/safety" element={<SafetyPage />} />
         <Route path="/therapy" element={<TherapyPage />} />
         <Route path="/body" element={<BodyPage />} />
-        <Route path="/insights" element={<DashboardPage />} />
         <Route path="/scenario-builder" element={<CustomScenarioBuilder />} />
         <Route path="/therapist-portal" element={<TherapistDashboardPage />} />
       </Routes>

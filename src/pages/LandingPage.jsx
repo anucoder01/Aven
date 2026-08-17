@@ -8,6 +8,7 @@ import { characters as SCENARIOS, CHARACTER_DOMAINS as DOMAINS } from '../data/c
 import { useUserStore } from '../store/userStore'
 import { getMaxUnlockedLevel } from '../lib/adaptiveDifficulty'
 import { speak } from '../services/ttsEngine'
+import { API_BASE_URL } from '../config'
 
 const DIFFICULTY_LABELS = ['', 'Cooperative', 'Skeptical', 'Dismissive', 'Critical', 'Hostile']
 const DIFFICULTY_COLORS = ['', '#2dd4bf', '#a78bfa', '#fbbf24', '#fb923c', '#fb7185']
@@ -146,7 +147,7 @@ export default function LandingPage() {
     if (!customPrompt.trim() || isGenerating) return
     setIsGenerating(true)
     try {
-      const res = await fetch('http://localhost:8000/llm/generate-scenario', {
+      const res = await fetch(`${API_BASE_URL}/llm/generate-scenario`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ prompt: customPrompt })
