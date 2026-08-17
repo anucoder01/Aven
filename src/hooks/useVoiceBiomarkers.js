@@ -2,7 +2,7 @@ import { useEffect, useRef } from 'react';
 import { useBodyStore } from '../store/bodyStore';
 import { API_BASE_URL } from '../config';
 
-export function useVoiceBiomarkers({ isVoiceMode, sessionId, userId = 'test_user' }) {
+export function useVoiceBiomarkers({ isVoiceMode, isRecording, sessionId, userId = 'test_user' }) {
   const mediaRecorderRef = useRef(null);
   const streamRef = useRef(null);
   const { addSpike } = useBodyStore();
@@ -10,7 +10,8 @@ export function useVoiceBiomarkers({ isVoiceMode, sessionId, userId = 'test_user
   useEffect(() => {
     let active = true;
 
-    if (isVoiceMode) {
+    // Only run biomarker extraction when voice mode is enabled and user is NOT actively using SpeechRecognition
+    if (isVoiceMode && !isRecording) {
       navigator.mediaDevices.getUserMedia({ audio: true })
         .then((stream) => {
           if (!active) {
@@ -88,5 +89,5 @@ export function useVoiceBiomarkers({ isVoiceMode, sessionId, userId = 'test_user
         streamRef.current = null;
       }
     };
-  }, [isVoiceMode, sessionId, userId, addSpike]);
+  }, [isVoiceMode, isRecording, sessionId, userId, addSpike]);
 }

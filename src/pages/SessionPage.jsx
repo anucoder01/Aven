@@ -200,8 +200,8 @@ export default function SessionPage() {
   })
   const [dominantEmotion, setDominantEmotion] = useState(null)
 
-  // Capture voice biomarkers using MediaRecorder continuously while in voice mode
-  useVoiceBiomarkers({ isVoiceMode, sessionId: scenarioId, userId: 'test_user' })
+  // Capture voice biomarkers using MediaRecorder continuously while in voice mode (and not actively speech recognizing)
+  useVoiceBiomarkers({ isVoiceMode, isRecording, sessionId: scenarioId, userId: 'test_user' })
 
   const { buildMemoryContext } = useCharacterMemoryStore()
   const memoryContextRef = useRef('')
@@ -488,28 +488,40 @@ export default function SessionPage() {
     recognition.interimResults = true
     recognition.lang = 'en-US'
 
+    let transcriptBuffer = ''
+
     recognition.onstart = () => { setRecording(true); setOrbState('listening') }
     recognition.onresult = (e) => {
       let interim = ''
       let finalStr = ''
       for (let i = e.resultIndex; i < e.results.length; i++) {
-        const transcript = e.results[i][0].transcript
+        const text = e.results[i][0].transcript
         if (e.results[i].isFinal) {
-          finalStr += transcript
+          finalStr += text
         } else {
-          interim += transcript
+          interim += text
         }
       }
       if (finalStr.trim()) {
-        setInputText(finalStr.trim())
-        handleSend(finalStr.trim())
+        transcriptBuffer = (transcriptBuffer + ' ' + finalStr).trim()
+        setInputText(transcriptBuffer)
       } else if (interim.trim()) {
-        setInputText(interim)
+        setInputText((transcriptBuffer + ' ' + interim).trim())
       }
     }
-    recognition.onend = () => { setRecording(false); setOrbState('idle') }
+    recognition.onend = () => { 
+      setRecording(false); 
+      setOrbState('idle')
+      const textToSend = (transcriptBuffer || inputRef.current?.value || '').trim()
+      if (textToSend) {
+        handleSend(textToSend)
+      }
+    }
     recognition.onerror = (e) => { 
       console.warn('Speech recognition status:', e.error)
+      if (e.error === 'no-speech') {
+        return
+      }
       setRecording(false); 
       setOrbState('idle') 
     }
