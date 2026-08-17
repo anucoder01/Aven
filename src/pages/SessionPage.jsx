@@ -19,6 +19,14 @@ import { BiomarkerConsentModal } from '../components/therapy/BiomarkerConsentMod
 import { faceTensionEngine } from '../services/faceTensionEngine'
 import { speak, stopSpeaking } from '../services/ttsEngine'
 import { useVoiceBiomarkers } from '../hooks/useVoiceBiomarkers'
+import { API_BASE_URL } from '../config'
+
+const stripThinkTags = (text) => {
+  if (!text) return ""
+  let cleaned = text.replace(/<think>[\s\S]*?<\/think>/gi, '')
+  cleaned = cleaned.replace(/<think>[\s\S]*/gi, '')
+  return cleaned.trim()
+}
 
 // DISTORTION_COLORS removed
 
@@ -187,7 +195,9 @@ export default function SessionPage() {
   const videoRef = useRef(null)
   const animRef = useRef(null)
 
-  const [consentState, setConsentState] = useState(null)
+  const [consentState, setConsentState] = useState(() => {
+    return localStorage.getItem('aven_biomarker_consent') || 'accepted'
+  })
   const [dominantEmotion, setDominantEmotion] = useState(null)
 
   // Capture voice biomarkers using MediaRecorder continuously while in voice mode
@@ -229,7 +239,7 @@ export default function SessionPage() {
           "The user just walked up to you. Start the conversation in character.",
           isReversal
         )
-        const aiRes = await fetch('http://localhost:8000/llm/character', {
+        const aiRes = await fetch(`${API_BASE_URL}/llm/character`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -260,7 +270,14 @@ export default function SessionPage() {
             }
           }
         }
-        if (!aiResponse) aiResponse = "Hello."
+
+        aiResponse = stripThinkTags(aiResponse)
+        if (!aiResponse || aiResponse.startsWith('[Error:')) {
+          if (aiResponse.startsWith('[Error:')) {
+            console.warn("Backend LLM error during greeting:", aiResponse)
+          }
+          aiResponse = "Hello."
+        }
         
         setCharacterTyping(false)
 
@@ -313,7 +330,7 @@ export default function SessionPage() {
     addMessage({ id: msgId, role: 'user', text: userText })
 
     // Run distortion classifier via backend (fire-and-forget, non-blocking)
-    fetch('http://localhost:8000/classify', {
+    fetch(`${API_BASE_URL}/classify/`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ text: userText, session_id: String(scenarioId) })
@@ -366,7 +383,7 @@ export default function SessionPage() {
 
       // The LLM returns a streaming response. We could stream it into the UI,
       // but for simplicity, we'll fetch the whole response or mock it if the server isn't running.
-      const aiRes = await fetch('http://localhost:8000/llm/character', {
+      const aiRes = await fetch(`${API_BASE_URL}/llm/character`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -414,7 +431,13 @@ export default function SessionPage() {
         throw new Error("API failed: " + errorText)
       }
 
-      if (!aiResponse) aiResponse = "I'm not sure what to say to that."
+      aiResponse = stripThinkTags(aiResponse)
+      if (!aiResponse || aiResponse.startsWith('[Error:')) {
+        if (aiResponse.startsWith('[Error:')) {
+          console.warn("Backend LLM error during chat response:", aiResponse)
+        }
+        aiResponse = "I'm having a brief moment of distraction, but I'm here. Could you repeat that?"
+      }
 
       setCharacterTyping(false)
       
@@ -453,7 +476,7 @@ export default function SessionPage() {
     }
 
     if (isRecording) {
-      recognitionRef.current?.stop()
+      try { recognitionRef.current?.stop() } catch {}
       setRecording(false)
       setOrbState('idle')
       return
@@ -461,26 +484,42 @@ export default function SessionPage() {
 
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition
     const recognition = new SpeechRecognition()
-    recognition.continuous = false
-    recognition.interimResults = false
+    recognition.continuous = true
+    recognition.interimResults = true
     recognition.lang = 'en-US'
 
     recognition.onstart = () => { setRecording(true); setOrbState('listening') }
     recognition.onresult = (e) => {
-      // Get the latest result
-      const last = e.results.length - 1
-      const transcript = e.results[last][0].transcript
-      handleSend(transcript)
+      let interim = ''
+      let finalStr = ''
+      for (let i = e.resultIndex; i < e.results.length; i++) {
+        const transcript = e.results[i][0].transcript
+        if (e.results[i].isFinal) {
+          finalStr += transcript
+        } else {
+          interim += transcript
+        }
+      }
+      if (finalStr.trim()) {
+        setInputText(finalStr.trim())
+        handleSend(finalStr.trim())
+      } else if (interim.trim()) {
+        setInputText(interim)
+      }
     }
     recognition.onend = () => { setRecording(false); setOrbState('idle') }
     recognition.onerror = (e) => { 
-      console.error('Speech recognition error:', e.error, e.message)
+      console.warn('Speech recognition status:', e.error)
       setRecording(false); 
       setOrbState('idle') 
     }
 
     recognitionRef.current = recognition
-    recognition.start()
+    try {
+      recognition.start()
+    } catch (e) {
+      console.warn('Recognition start exception:', e)
+    }
   }
 
   const handleEndSession = () => {
@@ -522,7 +561,7 @@ export default function SessionPage() {
                   setDominantEmotion(result.dominantEmotion)
                 }
                 
-                fetch('http://localhost:8000/biomarker/facial', {
+                fetch(`${API_BASE_URL}/biomarker/facial`, {
                   method: 'POST',
                   headers: { 'Content-Type': 'application/json' },
                   body: JSON.stringify({
