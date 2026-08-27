@@ -10,8 +10,11 @@ from typing import List, Optional
 import json
 import os
 import asyncio
+from pathlib import Path
 from dotenv import load_dotenv
 
+backend_dir = Path(__file__).resolve().parent.parent
+load_dotenv(dotenv_path=backend_dir / ".env")
 load_dotenv()
 
 import httpx
@@ -45,8 +48,8 @@ from config import settings
 
 OLLAMA_BASE_URL = os.environ.get("OLLAMA_BASE_URL", getattr(settings, "ollama_base_url", "http://localhost:11434"))
 OLLAMA_MODEL = os.environ.get("OLLAMA_MODEL", getattr(settings, "ollama_model", "llama3.1:8b"))
-GROQ_MODEL = os.environ.get("GROQ_MODEL", getattr(settings, "groq_model", "groq/compound"))
-GROQ_FALLBACK_MODELS = [GROQ_MODEL, "llama-3.3-70b-versatile", "llama3-8b-8192", "groq/compound"]
+GROQ_MODEL = os.environ.get("GROQ_MODEL", getattr(settings, "groq_model", "openai/gpt-oss-20b"))
+GROQ_FALLBACK_MODELS = [GROQ_MODEL, "openai/gpt-oss-20b", "groq/compound-mini", "openai/gpt-oss-120b", "qwen/qwen3.6-27b"]
 
 def get_model_name(provider: str) -> str:
     if provider == "ollama":
@@ -75,23 +78,28 @@ def get_llm_client():
         except Exception:
             pass
 
-    if os.environ.get("GROQ_API_KEY") and HAS_OPENAI:
+    groq_key = os.environ.get("GROQ_API_KEY") or getattr(settings, "groq_api_key", "")
+    if groq_key and HAS_OPENAI:
         try:
             return AsyncOpenAI(
-                api_key=os.environ.get("GROQ_API_KEY"),
+                api_key=groq_key,
                 base_url="https://api.groq.com/openai/v1"
             ), "groq"
         except Exception:
             pass
-    elif os.environ.get("GEMINI_API_KEY") and HAS_GEMINI:
+
+    gemini_key = os.environ.get("GEMINI_API_KEY") or getattr(settings, "gemini_api_key", "")
+    if gemini_key and HAS_GEMINI:
         try:
-            genai.configure(api_key=os.environ.get("GEMINI_API_KEY"))
+            genai.configure(api_key=gemini_key)
             return genai, "gemini"
         except Exception:
             pass
-    elif os.environ.get("OPENAI_API_KEY") and HAS_OPENAI:
+
+    openai_key = os.environ.get("OPENAI_API_KEY") or getattr(settings, "openai_api_key", "")
+    if openai_key and HAS_OPENAI:
         try:
-            return AsyncOpenAI(api_key=os.environ.get("OPENAI_API_KEY")), "openai"
+            return AsyncOpenAI(api_key=openai_key), "openai"
         except Exception:
             pass
 
@@ -223,7 +231,14 @@ async def character_response(req: CharacterRequest):
         delay = 1.0 if req.difficulty_level <= 2 else (3.0 if req.difficulty_level == 3 else 4.5)
         await asyncio.sleep(delay)
 
-        system_instruction = req.system_prompt + "\n\nCRITICAL INSTRUCTION: Do NOT output any internal thoughts, reasoning steps, or <think> tags. Output ONLY your direct spoken dialogue in character."
+        system_instruction = (
+            req.system_prompt +
+            "\n\nCRITICAL ROLEPLAY CONSTRAINTS:\n"
+            "1. You are roleplaying as a human character in a realistic exposure therapy simulation. Speak ONLY in direct, natural human spoken dialogue.\n"
+            "2. Keep your response brief (1-3 spoken sentences maximum, ~15-40 words).\n"
+            "3. NEVER output markdown headings (###), numbered lists, bullet points, code blocks, or project plans.\n"
+            "4. NEVER break character, act as an AI assistant, or output internal thought/reasoning tags."
+        )
 
         if provider in ["openai", "groq", "ollama"]:
             messages = [{"role": "system", "content": system_instruction}]
@@ -250,12 +265,13 @@ async def character_response(req: CharacterRequest):
                     stream = await client.chat.completions.create(
                         model=model_name,
                         messages=messages,
-                        max_tokens=250,
+                        max_tokens=500,
                         temperature=0.85,
                         stream=True
                     )
                     in_think_block = False
                     think_buffer = ""
+                    yielded_any = False
                     async for chunk in stream:
                         if not chunk.choices:
                             continue
@@ -273,10 +289,18 @@ async def character_response(req: CharacterRequest):
                                 think_buffer = ""
                                 if after_think:
                                     yield f"data: {json.dumps({'delta': after_think})}\n\n"
+                                    yielded_any = True
                             continue
 
                         if delta:
                             yield f"data: {json.dumps({'delta': delta})}\n\n"
+                            yielded_any = True
+
+                    if in_think_block and think_buffer and not yielded_any:
+                        clean_buf = re.sub(r"<think>.*?(?:</think>|$)", "", think_buffer, flags=re.DOTALL).strip()
+                        if clean_buf:
+                            yield f"data: {json.dumps({'delta': clean_buf})}\n\n"
+
                     stream_success = True
                     break
                 except Exception as e:
