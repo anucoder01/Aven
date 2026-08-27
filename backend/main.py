@@ -16,6 +16,8 @@ from database import engine, Base
 import subprocess
 import logging
 
+from sqlalchemy import text
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Check for ffmpeg
@@ -27,6 +29,16 @@ async def lifespan(app: FastAPI):
     # Initialize Database
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+        try:
+            await conn.execute(text("ALTER TABLE facial_tension_samples ADD COLUMN IF NOT EXISTS emotion_happy FLOAT;"))
+            await conn.execute(text("ALTER TABLE facial_tension_samples ADD COLUMN IF NOT EXISTS emotion_sad FLOAT;"))
+            await conn.execute(text("ALTER TABLE facial_tension_samples ADD COLUMN IF NOT EXISTS emotion_angry FLOAT;"))
+            await conn.execute(text("ALTER TABLE facial_tension_samples ADD COLUMN IF NOT EXISTS emotion_fear FLOAT;"))
+            await conn.execute(text("ALTER TABLE facial_tension_samples ADD COLUMN IF NOT EXISTS emotion_surprise FLOAT;"))
+            await conn.execute(text("ALTER TABLE facial_tension_samples ADD COLUMN IF NOT EXISTS emotion_disgust FLOAT;"))
+            await conn.execute(text("ALTER TABLE facial_tension_samples ADD COLUMN IF NOT EXISTS dominant_emotion VARCHAR;"))
+        except Exception as e:
+            logging.warning(f"Column migration warning: {e}")
     yield
     # Shutdown placeholder
 
