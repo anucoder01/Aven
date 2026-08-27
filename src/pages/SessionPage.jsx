@@ -255,25 +255,39 @@ export default function SessionPage() {
           const reader = aiRes.body.getReader()
           const decoder = new TextDecoder()
           let done = false
+          let buffer = ""
           while (!done) {
             const { value, done: readerDone } = await reader.read()
             done = readerDone
             if (value) {
-              const chunk = decoder.decode(value)
-              const lines = chunk.split('\n')
+              buffer += decoder.decode(value, { stream: !done })
+              const lines = buffer.split('\n')
+              buffer = lines.pop() || ""
               for (const line of lines) {
-                if (line.startsWith('data: ') && line !== 'data: [DONE]') {
-                  const data = JSON.parse(line.replace('data: ', ''))
-                  aiResponse += data.delta
+                const trimmed = line.trim()
+                if (trimmed.startsWith('data: ') && trimmed !== 'data: [DONE]') {
+                  try {
+                    const data = JSON.parse(trimmed.replace('data: ', ''))
+                    if (data.delta) aiResponse += data.delta
+                  } catch {}
                 }
               }
+            }
+          }
+          if (buffer && buffer.trim()) {
+            const trimmed = buffer.trim()
+            if (trimmed.startsWith('data: ') && trimmed !== 'data: [DONE]') {
+              try {
+                const data = JSON.parse(trimmed.replace('data: ', ''))
+                if (data.delta) aiResponse += data.delta
+              } catch {}
             }
           }
         }
 
         aiResponse = stripThinkTags(aiResponse)
-        if (!aiResponse || aiResponse.startsWith('[Error:')) {
-          if (aiResponse.startsWith('[Error:')) {
+        if (!aiResponse || aiResponse.startsWith('[Error:') || aiResponse.startsWith('[SYSTEM:')) {
+          if (aiResponse.startsWith('[Error:') || aiResponse.startsWith('[SYSTEM:')) {
             console.warn("Backend LLM error during greeting:", aiResponse)
           }
           aiResponse = "Hello."
@@ -408,7 +422,7 @@ export default function SessionPage() {
               buffer += decoder.decode(value, { stream: !done })
               const lines = buffer.split('\n')
               // Keep the last element in the buffer since it might be an incomplete line
-              buffer = lines.pop()
+              buffer = lines.pop() || ""
               
               for (const line of lines) {
                 const trimmed = line.trim()
@@ -425,6 +439,17 @@ export default function SessionPage() {
               }
             }
           }
+          if (buffer && buffer.trim()) {
+            const trimmed = buffer.trim()
+            if (trimmed.startsWith('data: ') && trimmed !== 'data: [DONE]') {
+              try {
+                const data = JSON.parse(trimmed.replace('data: ', ''))
+                if (data.delta) {
+                  aiResponse += data.delta
+                }
+              } catch {}
+            }
+          }
         } else {
         const errorText = await aiRes.text()
         console.error("Backend returned error:", aiRes.status, errorText)
@@ -432,8 +457,8 @@ export default function SessionPage() {
       }
 
       aiResponse = stripThinkTags(aiResponse)
-      if (!aiResponse || aiResponse.startsWith('[Error:')) {
-        if (aiResponse.startsWith('[Error:')) {
+      if (!aiResponse || aiResponse.startsWith('[Error:') || aiResponse.startsWith('[SYSTEM:')) {
+        if (aiResponse.startsWith('[Error:') || aiResponse.startsWith('[SYSTEM:')) {
           console.warn("Backend LLM error during chat response:", aiResponse)
         }
         aiResponse = "I'm having a brief moment of distraction, but I'm here. Could you repeat that?"
