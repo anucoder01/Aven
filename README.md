@@ -19,23 +19,30 @@ Aven's core research contribution is a custom-trained RoBERTa model that operate
 - Analyzes 15 distinct cognitive distortions (e.g., Catastrophizing, Mind Reading, All-or-Nothing).
 - Features a dual-head architecture to provide **multi-label classification** and **severity scoring (1–5)** simultaneously for every message.
 
-### 3. Avoidance & Vocal Biomarker Tracking
-Aven listens to *how* you speak, not just what you say.
+### 3. Avoidance, Vocal & Facial Emotion Biomarker Tracking
+Aven listens to *how* you speak and observes your non-verbal cues in real time.
 - **Avoidance Detection:** Flags hedging, deflection, topic changes, and message abandonment mid-session.
-- **Vocal Baseline Analysis:** In Voice Mode, Aven measures your pitch elevation, jitter, filler word rate, and speech rate against your personal baseline.
+- **Vocal Baseline Analysis:** In Voice Mode, Aven measures your pitch elevation, jitter, filler word rate, and speech rate against your personal baseline with continuous mic hardware deconfliction.
+- **Facial Emotion & Tension Tracking:** Uses on-device MediaPipe Face Landmarker to extract 52 facial blendshapes, computing a composite Facial Tension Index and real-time emotion breakdowns (Happiness, Sadness, Anger, Fear, Surprise, Disgust).
 
-### 4. Surgical Post-Session Analysis
+### 4. Interactive 3D AI Companion Orb & Landing Page Voice Agent
+- **Procedural 3D Visualizer:** Driven by WebGL, React Three Fiber, and custom shaders with multi-light rigs and audio-reactive particle rings.
+- **Dynamic State System:** Visualizes AI states (*Idle, Listening, Speaking, Thinking*) with state-aware glowing colors and physics distortion.
+- **Interactive Voice Greetings:** Landing page orb features conversational intent handling and automatic audio greetings.
+
+### 5. Surgical Post-Session Analysis & Clinician Dashboard
 At the end of a session, Aven generates a beautiful, actionable CBT report:
 - Color-coded annotated transcripts highlighting distortions and assertive moments.
 - Specific, CBT-grounded reframes using your *exact words*.
 - Assertiveness scoring (1–10) with breakdowns on directness and confidence markers.
+- **Clinician Portal Sync & Fear Hierarchy Tracking:** Live synchronization of session analytics and automatic completion tracking across user fear hierarchies.
 
-### 5. Deep Clinical Safety Systems
-Aven prioritizes user safety above all else.
+### 6. Deep Clinical Safety & Resilient Streaming Systems
+Aven prioritizes user safety and seamless streaming performance above all else.
 - **SUDS Tracking:** Mid-session Subjective Units of Distress Scale (SUDS) checks. If SUDS > 75, the app automatically triggers a pause protocol.
 - **Crisis NLP Detector:** A separate, async NLP pipeline constantly monitors for crisis language, surfacing immediate helpline resources and safely terminating the session.
-- **Integrated Breathing Tools:** Physiological sighs and 4-7-8 breathing are embedded directly into the UI as panic buttons.
-- **Ambient Grounding Soundscapes:** A procedural Web Audio API engine that generates soothing brown noise (like distant rain or a cafe murmur) to anchor the user and reduce silence-induced anxiety during the simulation.
+- **Integrated Breathing Tools & Ambient Soundscapes:** Procedural Web Audio API engine providing brown noise soundscapes and physiological sigh breathing guides.
+- **Resilient SSE Streaming Engine & Roleplay Guardrails:** Stream buffering in React for fragmented JSON packets, combined with real-time `<think>` tag sanitization and zero-breakout prompt constraints to enforce 1–3 sentence spoken human realism.
 
 ---
 
@@ -44,22 +51,22 @@ Aven prioritizes user safety above all else.
 | Feature | Generic AI Chatbots (ChatGPT/Claude) | Traditional VR Exposure Therapy | **Aven** |
 | :--- | :--- | :--- | :--- |
 | **Realism** | Often break character, use overly helpful "therapy speak", or apologize unprompted. | Scripts are pre-recorded and rigid. You cannot have an organic conversation. | **Strictly enforced human realism**. Characters never break role, use therapy language, or act like an AI. |
-| **Analysis Depth** | Provide generic, high-level summaries after you ask for them. | Require a human therapist to review recordings later. | **Real-time, multi-label distortion detection** and exact-quote reframing. |
+| **Analysis Depth** | Provide generic, high-level summaries after you ask for them. | Require a human therapist to review recordings later. | **Real-time, multi-label distortion detection**, facial emotion tracking, and exact-quote reframing. |
 | **Progression** | No structured fear hierarchy or graduated difficulty. | Difficult to tune precisely to the patient's exact breaking point. | **5 precise difficulty levels** per scenario, from cooperative to deliberately hostile and gaslighting. |
-| **Safety Guardrails** | Lack physiological monitoring; will continue roleplay even if you are spiraling. | Expensive biometric hardware required. | Built-in SUDS tracking, **vocal biomarker stress detection**, and crisis termination protocols. |
+| **Safety Guardrails** | Lack physiological monitoring; will continue roleplay even if you are spiraling. | Expensive biometric hardware required. | Built-in SUDS tracking, **vocal & facial biomarker stress detection**, and crisis termination protocols. |
 | **Modality** | Primarily text-based; voice mode is not optimized for therapeutic latency. | Visual-heavy, but conversation branching is limited. | **Voice + Text** with <1.2s round-trip latency and mid-session modality switch detection. |
 
 ---
 
 ## 🛠 Tech Stack
-- **Frontend:** React + Vite, TailwindCSS, Framer Motion
-- **Backend:** FastAPI, Python, PostgreSQL, SQLAlchemy
+- **Frontend:** React + Vite, TailwindCSS, Framer Motion, Three.js / React Three Fiber, Web Audio API
+- **Backend:** FastAPI, Python, SQLite (local fallback) / PostgreSQL, SQLAlchemy, Pydantic v2
 - **Machine Learning & Signal Processing:**
   - **RoBERTa (Transformer):** Fine-tuned for multi-label cognitive distortion classification.
-  - **MediaPipe Face Landmarker (CNNs):** On-device WebAssembly BlazeFace & Mesh model for extracting 52 facial blendshapes (Tension Index).
+  - **MediaPipe Face Landmarker (CNNs):** On-device WebAssembly BlazeFace & Mesh model for extracting 52 facial blendshapes (Facial Tension Index & 6 emotion metrics).
   - **WebRTC VAD (Gaussian Mixture Models):** Voice Activity Detection for speech rate estimation.
   - **Parselmouth/Praat (DSP):** Acoustic signal processing for extracting physiological voice tremors (F0 Pitch, Jitter, Shimmer).
-  - **Generative LLMs:** OpenAI / Anthropic APIs for dynamic CBT roleplay generation.
+  - **Generative LLMs & SSE Sanitizer:** Dynamic CBT roleplay generation with stream chunk buffering and reasoning tag stripping.
 
 ## 🚀 How to Run the Project
 
