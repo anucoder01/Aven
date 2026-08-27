@@ -1,6 +1,6 @@
 import { useRef, useMemo } from 'react'
 import { Canvas, useFrame } from '@react-three/fiber'
-import { MeshDistortMaterial, Environment, Float, Sphere } from '@react-three/drei'
+import { MeshDistortMaterial, Float, Sphere } from '@react-three/drei'
 import * as THREE from 'three'
 
 // Inner glowing orb
@@ -131,12 +131,12 @@ export default function AvenOrb({ state = 'idle', amplitude = 0, size = 300, onC
         gl={{ antialias: true, alpha: true }}
         style={{ background: 'transparent' }}
       >
-        <ambientLight intensity={0.3} />
-        <pointLight position={[5, 5, 5]} intensity={1.5} color="#2dd4bf" />
-        <pointLight position={[-5, -5, -5]} intensity={0.8} color="#8b5cf6" />
+        <ambientLight intensity={0.5} />
+        <directionalLight position={[10, 10, 5]} intensity={1.0} color="#ffffff" />
+        <pointLight position={[5, 5, 5]} intensity={1.8} color="#2dd4bf" />
+        <pointLight position={[-5, -5, -5]} intensity={1.2} color="#8b5cf6" />
         <OrbCore state={state} amplitude={amplitude} />
         <ParticleRing state={state} />
-        <Environment preset="night" />
       </Canvas>
     </div>
   )
