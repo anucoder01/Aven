@@ -9,6 +9,8 @@ from pydantic import BaseModel
 from typing import List, Optional
 import os
 
+import logging
+
 router = APIRouter()
 
 # Lazy model loading
@@ -17,10 +19,40 @@ _classifier = None
 def get_classifier():
     global _classifier
     if _classifier is None:
-        checkpoint = os.environ.get("MODEL_CHECKPOINT", "./ml/checkpoints/v1/best_model.pt")
-        if os.path.exists(checkpoint):
-            from ml.model import AvenInference
-            _classifier = AvenInference(checkpoint)
+        env_checkpoint = os.environ.get("MODEL_CHECKPOINT")
+        candidate_paths = []
+        if env_checkpoint:
+            candidate_paths.append(env_checkpoint)
+        
+        # Check standard default checkpoint locations relative to workspace and backend
+        candidate_paths.extend([
+            "./ml/checkpoints/v1/best_model.pt",
+            "../ml/checkpoints/v1/best_model.pt",
+            "./backend/ml/checkpoints/v1/best_model.pt",
+            "backend/ml/checkpoints/v1/best_model.pt",
+            os.path.join(os.path.dirname(__file__), "../../ml/checkpoints/v1/best_model.pt"),
+            os.path.join(os.path.dirname(__file__), "../ml/checkpoints/v1/best_model.pt"),
+        ])
+        
+        target_path = None
+        for path in candidate_paths:
+            if os.path.exists(path):
+                target_path = path
+                break
+                
+        if target_path:
+            try:
+                # Add parent directory to sys.path if needed for imports
+                import sys
+                root_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "../.."))
+                if root_dir not in sys.path:
+                    sys.path.insert(0, root_dir)
+                from ml.model import AvenInference
+                _classifier = AvenInference(target_path)
+                logging.info(f"Successfully loaded fine-tuned RoBERTa model from {target_path}")
+            except Exception as e:
+                logging.warning(f"Failed to load RoBERTa model from {target_path}: {e}. Falling back to rule-based mock.")
+                _classifier = "mock"
         else:
             _classifier = "mock"
     return _classifier
