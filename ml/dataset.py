@@ -4,6 +4,13 @@ from torch.utils.data import Dataset
 from transformers import RobertaTokenizer
 from model import DISTORTION_LABELS, NUM_LABELS
 
+
+def normalize_label(val):
+    if not isinstance(val, str):
+        return str(val).strip().lower()
+    return val.strip().lower().replace(" ", "_").replace("-", "_")
+
+
 class DistortionDataset(Dataset):
     def __init__(self, jsonl_path, max_length=128):
         self.data = []
@@ -38,12 +45,25 @@ class DistortionDataset(Dataset):
         raw_labels = item.get('labels', {})
         raw_sevs = item.get('severities', {})
         
+        if isinstance(raw_labels, dict):
+            norm_labels = {normalize_label(k): v for k, v in raw_labels.items()}
+        elif isinstance(raw_labels, list):
+            norm_labels = {normalize_label(x): 1 for x in raw_labels}
+        else:
+            norm_labels = {}
+
+        if isinstance(raw_sevs, dict):
+            norm_sevs = {normalize_label(k): v for k, v in raw_sevs.items()}
+        else:
+            norm_sevs = {}
+
         for i, label_key in enumerate(DISTORTION_LABELS):
-            if raw_labels.get(label_key, 0) == 1:
+            norm_key = normalize_label(label_key)
+            if norm_labels.get(norm_key, 0):
                 labels_tensor[i] = 1.0
                 # Severities in data are 1-5, model expects 0-4
-                sev = raw_sevs.get(label_key, 1)
-                severities_tensor[i] = max(0, min(4, sev - 1))
+                sev = norm_sevs.get(norm_key, 1)
+                severities_tensor[i] = max(0, min(4, int(sev) - 1))
             else:
                 labels_tensor[i] = 0.0
                 severities_tensor[i] = 0

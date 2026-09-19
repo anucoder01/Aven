@@ -94,11 +94,11 @@ class AvenClassifierLoss(nn.Module):
     Severity CE is masked to only active labels.
     """
 
-    def __init__(self, label_weight: float = 1.0, severity_weight: float = 0.5):
+    def __init__(self, label_weight: float = 1.0, severity_weight: float = 0.5, pos_weight: torch.Tensor = None):
         super().__init__()
         self.label_weight = label_weight
         self.severity_weight = severity_weight
-        self.bce = nn.BCEWithLogitsLoss()
+        self.bce = nn.BCEWithLogitsLoss(pos_weight=pos_weight)
         self.ce = nn.CrossEntropyLoss(reduction="none")
 
     def forward(self, label_logits, severity_logits, label_targets, severity_targets):
