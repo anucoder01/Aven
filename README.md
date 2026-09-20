@@ -1,6 +1,6 @@
 # Aven: Clinical-Grade Social Anxiety CBT Simulator
 
-Aven is a next-generation exposure therapy tool designed to help individuals with social anxiety practice difficult conversations in a safe, deeply realistic, and scientifically grounded environment. 
+Aven is a next-generation exposure therapy tool designed to help individuals with social anxiety practice difficult conversations in a safe, deeply realistic, and scientifically grounded environment.
 
 By combining **graduated exposure therapy simulation** with a **fine-tuned RoBERTa cognitive distortion classifier** and **vocal biomarker analysis**, Aven offers a private, clinically rigorous space to overcome social fear.
 
@@ -9,15 +9,17 @@ By combining **graduated exposure therapy simulation** with a **fine-tuned RoBER
 ## 🌟 Key Features
 
 ### 1. Graduated Exposure Therapy Engine
-Practice 25 highly distinct, real-world scenarios across 6 core domains: *Authority, Strangers, Group Dynamics, Assertiveness, Workplace, and Intimacy*. 
+Practice 25 highly distinct, real-world scenarios across 6 core domains: *Authority, Strangers, Group Dynamics, Assertiveness, Workplace, and Intimacy*.
 - **Escalating Difficulty:** Characters scale from Level 1 (Warm & Cooperative) to Level 5 (Hostile, Interrupting, and Dismissive).
 - **Persistent Memory:** Characters remember your past interactions and organically bring up your previous failures or successes to maintain realism.
 - **Human-like Latency:** The AI simulates human cognitive load, responding instantly when friendly (L1) but pausing deliberately to "judge" you before delivering hostile replies (L5).
 
 ### 2. Real-Time Cognitive Distortion Classification
-Aven's core research contribution is a custom-trained RoBERTa model that operates asynchronously during your session. 
-- Analyzes 15 distinct cognitive distortions (e.g., Catastrophizing, Mind Reading, All-or-Nothing).
-- Features a dual-head architecture to provide **multi-label classification** and **severity scoring (1–5)** simultaneously for every message.
+Aven's core research contribution is a custom-trained RoBERTa model that operates asynchronously during your session.
+- Analyzes **15 distinct cognitive distortions** (e.g., Catastrophizing, Mind Reading, All-or-Nothing).
+- Features a **dual-head architecture** to provide multi-label classification and **severity scoring (1–5)** simultaneously for every message.
+- **v1 Trained Checkpoint achieved Val Macro-F1 = 0.7029** over 6 epochs, after overcoming 4 documented training failures (silent fake data, label mismatch, class-weight collapse, threshold under-shooting). See [`ROBERTA_UPDATES.md`](ROBERTA_UPDATES.md) for the full empirical log.
+- Inference threshold calibrated to **0.35** (empirically validated against the v1 checkpoint) across both `ml/model.py` and the `/classify/` API endpoint.
 
 ### 3. Avoidance, Vocal & Facial Emotion Biomarker Tracking
 Aven listens to *how* you speak and observes your non-verbal cues in real time.
@@ -62,15 +64,43 @@ Aven prioritizes user safety and seamless streaming performance above all else.
 - **Frontend:** React + Vite, TailwindCSS, Framer Motion, Three.js / React Three Fiber, Web Audio API
 - **Backend:** FastAPI, Python, SQLite (local fallback) / PostgreSQL, SQLAlchemy, Pydantic v2
 - **Machine Learning & Signal Processing:**
-  - **RoBERTa (Transformer):** Fine-tuned for multi-label cognitive distortion classification.
+  - **RoBERTa (Transformer):** Fine-tuned for multi-label cognitive distortion classification. v1 checkpoint achieves **Val Macro-F1 = 0.7029**.
   - **MediaPipe Face Landmarker (CNNs):** On-device WebAssembly BlazeFace & Mesh model for extracting 52 facial blendshapes (Facial Tension Index & 6 emotion metrics).
   - **WebRTC VAD (Gaussian Mixture Models):** Voice Activity Detection for speech rate estimation.
   - **Parselmouth/Praat (DSP):** Acoustic signal processing for extracting physiological voice tremors (F0 Pitch, Jitter, Shimmer).
   - **Generative LLMs & SSE Sanitizer:** Dynamic CBT roleplay generation with stream chunk buffering and reasoning tag stripping.
 
+---
+
+## 🤖 LLM Provider Support
+
+Aven supports multiple LLM backends with automatic provider detection and fallback chaining. Configure any one (or more) of the following in `backend/.env`:
+
+| Priority | Provider | Env Key | Default Model | Notes |
+| :---: | :--- | :--- | :--- | :--- |
+| 1 | **Ollama** (local) | *(no key needed)* | `qwen2.5:3b` | Zero-cost, fully private |
+| 2 | **Groq** | `GROQ_API_KEY` | `openai/gpt-oss-20b` | Ultra-fast; free tier available ✅ |
+| 3 | **Gemini** | `GEMINI_API_KEY` | `gemini-2.0-flash` | Google AI |
+| 4 | **OpenAI** | `OPENAI_API_KEY` | `gpt-4o-mini` | GPT-4o series |
+| 5 | **Anthropic** | `ANTHROPIC_API_KEY` | `claude-3-5-haiku-20241022` | Claude series |
+
+**Groq fallback chain** (tried in order on rate-limit/error):
+`openai/gpt-oss-20b` → `openai/gpt-oss-120b` → `llama-3.3-70b-versatile` → `llama-3.1-8b-instant` → `groq/compound-mini`
+
+> **Deprecated models removed:** `qwen/qwen3.6-27b`, `Mixtral 8x7B`, `Gemma 2 9B IT`, `QwQ-32B`, `llama3-groq-*-tool-use-preview`. Do NOT use these IDs — they cause decommission crashes.
+
+---
+
 ## 🚀 How to Run the Project
 
-### 1. Start the Backend (FastAPI)
+### 1. Configure Environment Variables
+Copy the template and fill in at least one LLM provider key:
+```bash
+cp backend/.env.example backend/.env
+# Then edit backend/.env with your keys
+```
+
+### 2. Start the Backend (FastAPI)
 Open a terminal, navigate to the `backend` folder, and start the Python server:
 ```bash
 cd backend
@@ -79,13 +109,21 @@ uvicorn main:app --reload
 ```
 *The backend will run on `http://localhost:8080`.*
 
-### 2. Start the Frontend (React + Vite)
+### 3. Start the Frontend (React + Vite)
 Open a second terminal in the root project folder (`Aven`), install dependencies, and start the development server:
 ```bash
 npm install
 npm run dev
 ```
 *The frontend will run on `http://localhost:5173` (or similar).*
+
+### 4. RoBERTa Model Checkpoint (Optional)
+The v1 fine-tuned checkpoint (`best_model.pt`, ~477 MB) is not tracked in Git due to GitHub's file size limit. To enable live RoBERTa inference:
+1. Download or train `best_model.pt` via the Colab notebook in `ml/`.
+2. Place it at `backend/ml/checkpoints/v1/best_model.pt`.
+3. The backend will auto-detect and load it on startup. The `/classify/` endpoint will return `"model_used": "roberta-base-finetuned"`.
+
+Without the checkpoint, Aven falls back to keyword-based heuristic classification.
 
 ---
 
@@ -94,7 +132,7 @@ npm run dev
 ---
 
 ## Security
-If you are deploying this project or pushing it to a public GitHub repository, make sure **NOT** to commit your `.env` files. The included `.gitignore` file is configured to exclude `.env` files and `__pycache__` to prevent accidental leakage of your Groq or OpenAI API keys. A template `.env.example` has been provided for reference.
+If you are deploying this project or pushing it to a public GitHub repository, make sure **NOT** to commit your `.env` files. The included `.gitignore` file is configured to exclude `.env` files, `__pycache__`, ML model checkpoints (`*.pt`, `*.bin`, `*.safetensors`), and the local SQLite database to prevent accidental leakage of API keys or large binary files. A template `.env.example` has been provided for reference.
 
 ## Copyright & License
 Copyright &copy; 2026 Aven Social Anxiety CBT Simulator. All rights reserved.
