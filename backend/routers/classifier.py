@@ -61,7 +61,7 @@ def get_classifier():
 class ClassifyRequest(BaseModel):
     text: str
     session_id: Optional[str] = None
-    threshold: float = 0.45
+    threshold: float = 0.35
     temperature: float = 1.0
 
 
