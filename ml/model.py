@@ -142,7 +142,7 @@ class AvenInference:
         self.model.to(self.device)
         self.model.eval()
 
-    def classify(self, text: str, threshold: float = 0.45, temperature: float = 1.0) -> List[Dict]:
+    def classify(self, text: str, threshold: float = 0.35, temperature: float = 1.0) -> List[Dict]:
         """
         Returns list of detected distortions with severity.
         Each entry: { key, label, confidence, severity }
