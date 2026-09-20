@@ -62,3 +62,9 @@ venv.bak/
 # Project Specific
 backend/__pycache__/
 *.db
+
+# ML Model Checkpoints (too large for GitHub, download separately)
+ml/checkpoints/
+*.pt
+*.bin
+*.safetensors
