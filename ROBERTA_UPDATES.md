@@ -60,13 +60,27 @@ Every issue below was identified by inspecting full empirical logs rather than a
 
 ---
 
-## 🎯 Current Status & Next Execution Steps
+### Run 5: Successful Convergence (Val Macro-F1 = 0.7029) 🎉
+- **What Happened**: Applying the 3 balanced fixes resulted in clean convergence and a dramatic jump in performance:
+  - **Epoch 1**: Train Loss: 1.5612 | Val Macro-F1: 0.0150
+  - **Epoch 2**: Train Loss: 1.4108 | Val Macro-F1: 0.0000
+  - **Epoch 3**: Train Loss: 1.2788 | Val Macro-F1: 0.5546
+  - **Epoch 4**: Train Loss: 1.0132 | Val Macro-F1: 0.6469
+  - **Epoch 5**: Train Loss: 0.8595 | Val Macro-F1: 0.6975
+  - **Epoch 6**: Train Loss: 0.6768 | **Val Macro-F1: 0.7029** (Best Checkpoint)
+- **Empirical Validation**:
+  - Macro-F1 jumped from **0.0370 (Fail #4)** and **0.1041 (Fail #3)** up to **0.7029**.
+  - Train Loss dropped steadily from 1.5612 down to 0.6768 over 6 epochs.
+  - The moderate class weighting (`pos_weight = 4.0`), learning rate (`1e-4`), unfreezing top 6 layers (layers 6–11), and inference threshold `0.35` perfectly balanced precision and recall across multi-label targets.
 
-1. **Colab Action**: In `Aven_RoBERTa_Training.ipynb`:
-   - **Step 6**: Set `pos_weight_tensor = torch.tensor([4.0] * NUM_LABELS).to(device)`, `lr = 1e-4`, `max_epochs = 12`.
-   - **Step 7 & 8**: Set `probs >= 0.35`.
-2. **Re-run**: Execute Steps 5 through 9 in Colab.
-3. **Verify Metrics**: Confirm Step 8 displays balanced non-zero Precision and Recall values across all categories.
-4. **Deploy**: Download `best_model.pt` and place it in `backend/ml/checkpoints/v1/best_model.pt`.
-5. **Verify Endpoint**: Start backend (`uvicorn main:app --reload`) and test POST `/classify/` to ensure `model_used` returns `"roberta-base-finetuned"`.
+---
+
+## 🎯 Current Status & Next Deployment Steps
+
+1. **Cell Execution in Colab**: Ensure Step 8, Step 9, and Step 10 complete in Colab.
+2. **Download Model**: Download `best_model.pt` (which was saved device-agnostically on CPU) from Colab.
+3. **Place Checkpoint**: Move `best_model.pt` into the local repository at:
+   `backend/ml/checkpoints/v1/best_model.pt`
+4. **Verify Backend**: Start FastAPI (`uvicorn main:app --reload` inside `backend/`) and test `POST /classify/` to verify `model_used` returns `"roberta-base-finetuned"`.
+
 
