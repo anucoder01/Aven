@@ -1,6 +1,29 @@
 """
 FastAPI Router — /llm
-Handles character roleplay and CBT report generation via OpenAI/Claude.
+Handles character roleplay and CBT report generation via Groq, Gemini, OpenAI, Anthropic, or Ollama.
+
+Provider Fallback Priority (auto-selected based on available API keys):
+  1. Ollama (local, zero-cost, no key needed — if running)
+  2. Groq   (ultra-fast inference; uses production-only model list)
+  3. Gemini (Google; requires GEMINI_API_KEY)
+  4. OpenAI (requires OPENAI_API_KEY)
+  5. Anthropic / Claude (requires ANTHROPIC_API_KEY)
+  6. Rule-based mock (no LLM configured)
+
+Groq Production Model Fallback Chain (as of Sept 2026 — decommissioned models removed):
+  openai/gpt-oss-20b          — fast, efficient (primary)
+  openai/gpt-oss-120b         — high reasoning (secondary)
+  llama-3.3-70b-versatile     — general purpose production model
+  llama-3.1-8b-instant        — ultra-fast fallback
+  groq/compound-mini          — agentic compound system (single tool)
+
+Decommissioned / do NOT use:
+  - openai/gpt-oss (generic alias, unstable)
+  - qwen/qwen3.6-27b (deprecated July 2025)
+  - Mixtral 8x7B (deprecated March 2025)
+  - Gemma 2 9B IT (deprecated August 2025)
+  - Qwen-QwQ-32B (deprecated July 2025)
+  - llama3-groq-*-tool-use-preview (deprecated Jan 2025)
 """
 
 from fastapi import APIRouter
@@ -49,7 +72,17 @@ from config import settings
 OLLAMA_BASE_URL = os.environ.get("OLLAMA_BASE_URL", getattr(settings, "ollama_base_url", "http://localhost:11434"))
 OLLAMA_MODEL = os.environ.get("OLLAMA_MODEL", getattr(settings, "ollama_model", "llama3.1:8b"))
 GROQ_MODEL = os.environ.get("GROQ_MODEL", getattr(settings, "groq_model", "openai/gpt-oss-20b"))
-GROQ_FALLBACK_MODELS = [GROQ_MODEL, "openai/gpt-oss-20b", "groq/compound-mini", "openai/gpt-oss-120b", "qwen/qwen3.6-27b"]
+
+# Groq production model fallback chain — ONLY confirmed active production models.
+# Preview/deprecated models intentionally excluded to prevent decommission crashes.
+GROQ_FALLBACK_MODELS = [
+    GROQ_MODEL,                   # env override (default: openai/gpt-oss-20b)
+    "openai/gpt-oss-20b",         # fast, efficient — production
+    "openai/gpt-oss-120b",        # high reasoning — production
+    "llama-3.3-70b-versatile",    # general purpose — production
+    "llama-3.1-8b-instant",       # ultra-fast — production
+    "groq/compound-mini",         # agentic compound — production
+]
 
 def get_model_name(provider: str) -> str:
     if provider == "ollama":
@@ -57,9 +90,11 @@ def get_model_name(provider: str) -> str:
     elif provider == "groq":
         return GROQ_MODEL
     elif provider == "gemini":
-        return os.environ.get("GEMINI_MODEL", "gemini-1.5-flash")
+        return os.environ.get("GEMINI_MODEL", "gemini-2.0-flash")
+    elif provider == "anthropic":
+        return os.environ.get("ANTHROPIC_MODEL", "claude-3-5-haiku-20241022")
     else:
-        return os.environ.get("OPENAI_MODEL", "gpt-4o")
+        return os.environ.get("OPENAI_MODEL", "gpt-4o-mini")
 
 def _ollama_is_running(timeout_seconds: float = 1.0) -> bool:
     try:
@@ -69,6 +104,11 @@ def _ollama_is_running(timeout_seconds: float = 1.0) -> bool:
         return False
 
 def get_llm_client():
+    """
+    Auto-selects an LLM provider based on available keys/services.
+    Priority: Ollama (local) → Groq → Gemini → OpenAI → Anthropic → None (mock)
+    """
+    # 1. Ollama — local, zero-cost, no key needed
     if HAS_OPENAI and _ollama_is_running():
         try:
             return AsyncOpenAI(
@@ -78,6 +118,7 @@ def get_llm_client():
         except Exception:
             pass
 
+    # 2. Groq — ultra-fast inference, uses production-only fallback chain
     groq_key = os.environ.get("GROQ_API_KEY") or getattr(settings, "groq_api_key", "")
     if groq_key and HAS_OPENAI:
         try:
@@ -88,6 +129,7 @@ def get_llm_client():
         except Exception:
             pass
 
+    # 3. Gemini — Google AI, good for roleplay and structured JSON output
     gemini_key = os.environ.get("GEMINI_API_KEY") or getattr(settings, "gemini_api_key", "")
     if gemini_key and HAS_GEMINI:
         try:
@@ -96,6 +138,7 @@ def get_llm_client():
         except Exception:
             pass
 
+    # 4. OpenAI — fallback for GPT-4o series
     openai_key = os.environ.get("OPENAI_API_KEY") or getattr(settings, "openai_api_key", "")
     if openai_key and HAS_OPENAI:
         try:
@@ -103,6 +146,19 @@ def get_llm_client():
         except Exception:
             pass
 
+    # 5. Anthropic Claude — final API fallback before mock
+    anthropic_key = os.environ.get("ANTHROPIC_API_KEY") or getattr(settings, "anthropic_api_key", "")
+    if anthropic_key and HAS_OPENAI:
+        try:
+            # Anthropic supports OpenAI-compatible API format
+            return AsyncOpenAI(
+                api_key=anthropic_key,
+                base_url="https://api.anthropic.com/v1"
+            ), "anthropic"
+        except Exception:
+            pass
+
+    # 6. No provider — mock responses will be used
     return None, None
 
 
@@ -240,7 +296,7 @@ async def character_response(req: CharacterRequest):
             "4. NEVER break character, act as an AI assistant, or output internal thought/reasoning tags."
         )
 
-        if provider in ["openai", "groq", "ollama"]:
+        if provider in ["openai", "groq", "ollama", "anthropic"]:
             messages = [{"role": "system", "content": system_instruction}]
             formatted = []
             for m in req.messages:
@@ -256,7 +312,17 @@ async def character_response(req: CharacterRequest):
                 if messages[-1]["role"] != "user":
                     messages.append({"role": "user", "content": "Continue in character."})
             
-            candidate_models = GROQ_FALLBACK_MODELS if provider == "groq" else [get_model_name(provider)]
+            if provider == "groq":
+                candidate_models = GROQ_FALLBACK_MODELS
+            elif provider == "anthropic":
+                # Anthropic claude models via their OpenAI-compatible endpoint
+                candidate_models = [
+                    get_model_name("anthropic"),
+                    "claude-3-5-haiku-20241022",
+                    "claude-3-haiku-20240307",
+                ]
+            else:
+                candidate_models = [get_model_name(provider)]
             stream_success = False
             last_error = None
 
@@ -364,7 +430,7 @@ async def generate_report(req: ReportRequest):
     distortion_summary = json.dumps(req.distortion_events, indent=2)
 
     # Note: we are currently using OpenAI, Groq, Ollama, or Gemini for JSON report generation
-    if not client or provider not in ["openai", "groq", "ollama", "gemini"]:
+    if not client or provider not in ["openai", "groq", "ollama", "gemini", "anthropic"]:
         return await generate_mock_report(req.transcript, req.distortion_events)
 
     try:
@@ -380,7 +446,16 @@ async def generate_report(req: ReportRequest):
             )
             raw_text = response.text
         else:
-            candidate_models = GROQ_FALLBACK_MODELS if provider == "groq" else [get_model_name(provider)]
+            if provider == "groq":
+                candidate_models = GROQ_FALLBACK_MODELS
+            elif provider == "anthropic":
+                candidate_models = [
+                    get_model_name("anthropic"),
+                    "claude-3-5-haiku-20241022",
+                    "claude-3-haiku-20240307",
+                ]
+            else:
+                candidate_models = [get_model_name(provider)]
             raw_text = None
             last_error = None
             for model_name in candidate_models:
@@ -434,7 +509,7 @@ async def generate_scenario(req: GenerateScenarioRequest):
     client, provider = get_llm_client()
     
     # Fallback if no LLM configured
-    if not client or provider not in ["openai", "groq", "ollama"]:
+    if not client or provider not in ["openai", "groq", "ollama", "anthropic"]:
         return {
             "id": f"custom_{int(time.time())}",
             "name": "Custom AI Character",
@@ -487,7 +562,16 @@ async def generate_scenario(req: GenerateScenarioRequest):
     """
 
     try:
-        candidate_models = GROQ_FALLBACK_MODELS if provider == "groq" else [get_model_name(provider)]
+        if provider == "groq":
+            candidate_models = GROQ_FALLBACK_MODELS
+        elif provider == "anthropic":
+            candidate_models = [
+                get_model_name("anthropic"),
+                "claude-3-5-haiku-20241022",
+                "claude-3-haiku-20240307",
+            ]
+        else:
+            candidate_models = [get_model_name(provider)]
         data = None
         last_error = None
         for model_name in candidate_models:
