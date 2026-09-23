@@ -186,6 +186,8 @@ export default function SessionPage() {
 
   const [inputText, setInputText] = useState('')
   const [orbState, setOrbState] = useState('idle')
+  const [streamingText, setStreamingText] = useState('')
+  const [characterStatusText, setCharacterStatusText] = useState('')
   const [sessionEnded, setSessionEnded] = useState(false)
   const [isSoundscapeActive, setIsSoundscapeActive] = useState(false)
   const [isVoiceMode, setIsVoiceMode] = useState(true)
@@ -229,8 +231,12 @@ export default function SessionPage() {
     startSession(scenario, level)
     
     const fetchGreeting = async () => {
+      const isDifficult = level.level >= 3
       setCharacterTyping(true)
-      setOrbState('speaking')
+      setOrbState(isDifficult ? 'hesitating' : 'thinking')
+      setCharacterStatusText(isDifficult ? 'Hesitating...' : 'Thinking...')
+      setStreamingText('')
+
       try {
         const sysPrompt = sessionEngine.buildSystemPrompt(
           scenario.id, 
@@ -268,7 +274,12 @@ export default function SessionPage() {
                 if (trimmed.startsWith('data: ') && trimmed !== 'data: [DONE]') {
                   try {
                     const data = JSON.parse(trimmed.replace('data: ', ''))
-                    if (data.delta) aiResponse += data.delta
+                    if (data.delta) {
+                      aiResponse += data.delta
+                      setStreamingText(aiResponse)
+                      setOrbState('speaking')
+                      setCharacterStatusText('Speaking...')
+                    }
                   } catch {}
                 }
               }
@@ -279,7 +290,10 @@ export default function SessionPage() {
             if (trimmed.startsWith('data: ') && trimmed !== 'data: [DONE]') {
               try {
                 const data = JSON.parse(trimmed.replace('data: ', ''))
-                if (data.delta) aiResponse += data.delta
+                if (data.delta) {
+                  aiResponse += data.delta
+                  setStreamingText(aiResponse)
+                }
               } catch {}
             }
           }
@@ -293,7 +307,9 @@ export default function SessionPage() {
           aiResponse = "Hello."
         }
         
+        setStreamingText('')
         setCharacterTyping(false)
+        setCharacterStatusText('')
 
         let finalName = scenario.name
         let finalText = aiResponse
@@ -310,7 +326,9 @@ export default function SessionPage() {
         setTimeout(() => setOrbState('idle'), 1500)
       } catch (e) {
         console.warn("LLM greeting failed", e)
+        setStreamingText('')
         setCharacterTyping(false)
+        setCharacterStatusText('')
         addMessage({ role: 'ai', text: "Hello.", characterName: scenario.name })
         if (isVoiceMode) {
           await speak("Hello.", { rate: 1.0 })
@@ -318,14 +336,14 @@ export default function SessionPage() {
         setTimeout(() => setOrbState('idle'), 1500)
       }
     }
-    setTimeout(fetchGreeting, 800)
+    setTimeout(fetchGreeting, 400)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   // Auto-scroll
   useEffect(() => {
     chatBottomRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [messages, isCharacterTyping])
+  }, [messages, isCharacterTyping, streamingText])
 
   const handleSend = useCallback(async (text) => {
     if (!text.trim() || sessionEnded || isCharacterTyping) return
@@ -378,8 +396,11 @@ export default function SessionPage() {
     })
 
     // LLM Character Response via backend
+    const isDifficult = level.level >= 3
     setCharacterTyping(true)
-    setOrbState('speaking')
+    setOrbState(isDifficult ? 'hesitating' : 'thinking')
+    setCharacterStatusText(isDifficult ? 'Hesitating...' : 'Thinking...')
+    setStreamingText('')
     
     try {
       // Get the last N messages to send as context
@@ -395,8 +416,6 @@ export default function SessionPage() {
         userText
       )
 
-      // The LLM returns a streaming response. We could stream it into the UI,
-      // but for simplicity, we'll fetch the whole response or mock it if the server isn't running.
       const aiRes = await fetch(`${API_BASE_URL}/llm/character`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -409,48 +428,52 @@ export default function SessionPage() {
       })
       
       let aiResponse = ""
-        if (aiRes.ok) {
-          // Handle SSE stream briefly
-          const reader = aiRes.body.getReader()
-          const decoder = new TextDecoder()
-          let done = false
-          let buffer = ""
-          while (!done) {
-            const { value, done: readerDone } = await reader.read()
-            done = readerDone
-            if (value) {
-              buffer += decoder.decode(value, { stream: !done })
-              const lines = buffer.split('\n')
-              // Keep the last element in the buffer since it might be an incomplete line
-              buffer = lines.pop() || ""
-              
-              for (const line of lines) {
-                const trimmed = line.trim()
-                if (trimmed.startsWith('data: ') && trimmed !== 'data: [DONE]') {
-                  try {
-                    const data = JSON.parse(trimmed.replace('data: ', ''))
-                    if (data.delta) {
-                      aiResponse += data.delta
-                    }
-                  } catch {
-                    console.warn("Failed to parse SSE data chunk:", trimmed)
+      if (aiRes.ok) {
+        // Handle SSE stream in real-time
+        const reader = aiRes.body.getReader()
+        const decoder = new TextDecoder()
+        let done = false
+        let buffer = ""
+        while (!done) {
+          const { value, done: readerDone } = await reader.read()
+          done = readerDone
+          if (value) {
+            buffer += decoder.decode(value, { stream: !done })
+            const lines = buffer.split('\n')
+            // Keep the last element in the buffer since it might be an incomplete line
+            buffer = lines.pop() || ""
+            
+            for (const line of lines) {
+              const trimmed = line.trim()
+              if (trimmed.startsWith('data: ') && trimmed !== 'data: [DONE]') {
+                try {
+                  const data = JSON.parse(trimmed.replace('data: ', ''))
+                  if (data.delta) {
+                    aiResponse += data.delta
+                    setStreamingText(aiResponse)
+                    setOrbState('speaking')
+                    setCharacterStatusText('Speaking...')
                   }
+                } catch {
+                  console.warn("Failed to parse SSE data chunk:", trimmed)
                 }
               }
             }
           }
-          if (buffer && buffer.trim()) {
-            const trimmed = buffer.trim()
-            if (trimmed.startsWith('data: ') && trimmed !== 'data: [DONE]') {
-              try {
-                const data = JSON.parse(trimmed.replace('data: ', ''))
-                if (data.delta) {
-                  aiResponse += data.delta
-                }
-              } catch {}
-            }
+        }
+        if (buffer && buffer.trim()) {
+          const trimmed = buffer.trim()
+          if (trimmed.startsWith('data: ') && trimmed !== 'data: [DONE]') {
+            try {
+              const data = JSON.parse(trimmed.replace('data: ', ''))
+              if (data.delta) {
+                aiResponse += data.delta
+                setStreamingText(aiResponse)
+              }
+            } catch {}
           }
-        } else {
+        }
+      } else {
         const errorText = await aiRes.text()
         console.error("Backend returned error:", aiRes.status, errorText)
         throw new Error("API failed: " + errorText)
@@ -461,10 +484,12 @@ export default function SessionPage() {
         if (aiResponse.startsWith('[Error:') || aiResponse.startsWith('[SYSTEM:')) {
           console.warn("Backend LLM error during chat response:", aiResponse)
         }
-        aiResponse = "I'm having a brief moment of distraction, but I'm here. Could you repeat that?"
+        aiResponse = isDifficult ? "..." : "I'm listening."
       }
 
+      setStreamingText('')
       setCharacterTyping(false)
+      setCharacterStatusText('')
       
       let finalName = scenario.name
       let finalText = aiResponse
@@ -482,8 +507,10 @@ export default function SessionPage() {
 
     } catch (e) {
       console.warn("LLM API failed, falling back to mock", e)
+      setStreamingText('')
       setCharacterTyping(false)
-      const aiResponse = "I'm not sure what to say to that."
+      setCharacterStatusText('')
+      const aiResponse = isDifficult ? "..." : "I hear what you're saying."
       addMessage({ role: 'ai', text: aiResponse, characterName: scenario.name })
       if (isVoiceMode) {
         await speak(aiResponse, { rate: 1.0 })
@@ -716,7 +743,7 @@ export default function SessionPage() {
               style={{ backgroundColor: `${difficultyColor}15`, color: difficultyColor }}
             >
               <div className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ backgroundColor: difficultyColor }} />
-              {orbState === 'listening' ? 'Listening...' : orbState === 'speaking' ? 'Speaking...' : orbState === 'distortion' ? 'Distortion!' : 'In character'}
+              {orbState === 'listening' ? 'Listening...' : orbState === 'speaking' ? 'Speaking...' : orbState === 'hesitating' ? 'Hesitating...' : orbState === 'thinking' ? 'Thinking...' : orbState === 'distortion' ? 'Distortion!' : 'In character'}
             </div>
           </div>
         </div>
@@ -732,16 +759,30 @@ export default function SessionPage() {
               ))}
 
               {isCharacterTyping && (
-                <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex justify-start mb-3">
-                  <div className="chat-bubble-ai flex items-center gap-1.5">
-                    {[0, 0.15, 0.3].map(delay => (
-                      <motion.div
-                        key={delay}
-                        className="w-1.5 h-1.5 bg-text-muted rounded-full"
-                        animate={{ y: [0, -4, 0] }}
-                        transition={{ duration: 0.6, repeat: Infinity, delay }}
-                      />
-                    ))}
+                <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} className="flex justify-start mb-3">
+                  <div className="max-w-[78%] items-start flex flex-col gap-1.5">
+                    <span className="text-[10px] text-text-muted ml-1 uppercase tracking-wide flex items-center gap-1.5">
+                      {scenario.name} • <span className="text-amber-400 font-medium">{characterStatusText || (level.level >= 3 ? 'Hesitating...' : 'Thinking...')}</span>
+                    </span>
+                    <div className="chat-bubble-ai">
+                      {streamingText ? (
+                        <p className="text-sm leading-relaxed text-text-primary whitespace-pre-wrap">{streamingText}</p>
+                      ) : (
+                        <div className="flex items-center gap-2 py-0.5 px-1">
+                          <span className="text-xs text-text-secondary">{level.level >= 3 ? 'Hesitating' : 'Thinking'}</span>
+                          <div className="flex items-center gap-1">
+                            {[0, 0.15, 0.3].map(delay => (
+                              <motion.div
+                                key={delay}
+                                className="w-1.5 h-1.5 bg-amber-400 rounded-full"
+                                animate={{ y: [0, -3, 0], opacity: [0.4, 1, 0.4] }}
+                                transition={{ duration: 0.7, repeat: Infinity, delay }}
+                              />
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </motion.div>
               )}
