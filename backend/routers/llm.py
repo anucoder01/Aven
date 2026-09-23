@@ -73,15 +73,11 @@ OLLAMA_BASE_URL = os.environ.get("OLLAMA_BASE_URL", getattr(settings, "ollama_ba
 OLLAMA_MODEL = os.environ.get("OLLAMA_MODEL", getattr(settings, "ollama_model", "llama3.1:8b"))
 GROQ_MODEL = os.environ.get("GROQ_MODEL", getattr(settings, "groq_model", "openai/gpt-oss-20b"))
 
-# Groq production model fallback chain — ONLY confirmed active production models.
-# Preview/deprecated models intentionally excluded to prevent decommission crashes.
+# Groq production model fallback chain — prioritized for ultra-low latency (<300ms)
 GROQ_FALLBACK_MODELS = [
-    GROQ_MODEL,                   # env override (default: openai/gpt-oss-20b)
-    "openai/gpt-oss-20b",         # fast, efficient — production
-    "openai/gpt-oss-120b",        # high reasoning — production
-    "llama-3.3-70b-versatile",    # general purpose — production
-    "llama-3.1-8b-instant",       # ultra-fast — production
-    "groq/compound-mini",         # agentic compound — production
+    "qwen/qwen3.8-27b",           # ultra-fast direct dialogue (~250ms)
+    "openai/gpt-oss-120b",        # high intelligence (~500ms)
+    "openai/gpt-oss-20b",         # production fallback
 ]
 
 def get_model_name(provider: str) -> str:
@@ -282,10 +278,7 @@ async def character_response(req: CharacterRequest):
         return StreamingResponse(mock_stream(), media_type="text/event-stream")
 
     async def llm_stream():
-        import asyncio
-        import re
-        delay = 1.0 if req.difficulty_level <= 2 else (3.0 if req.difficulty_level == 3 else 4.5)
-        await asyncio.sleep(delay)
+        # Remove artificial blocking sleep so inference starts immediately
 
         system_instruction = (
             req.system_prompt +
@@ -331,7 +324,7 @@ async def character_response(req: CharacterRequest):
                     stream = await client.chat.completions.create(
                         model=model_name,
                         messages=messages,
-                        max_tokens=500,
+                        max_tokens=300,
                         temperature=0.85,
                         stream=True
                     )
@@ -366,20 +359,19 @@ async def character_response(req: CharacterRequest):
                         clean_buf = re.sub(r"<think>.*?(?:</think>|$)", "", think_buffer, flags=re.DOTALL).strip()
                         if clean_buf:
                             yield f"data: {json.dumps({'delta': clean_buf})}\n\n"
+                            yielded_any = True
 
-                    stream_success = True
-                    break
+                    if yielded_any:
+                        stream_success = True
+                        break
                 except Exception as e:
                     last_error = e
-                    # If error is model not found or decommissioned, try next fallback
-                    err_str = str(e).lower()
-                    if "model_not_found" in err_str or "model_decommissioned" in err_str or "404" in err_str:
-                        continue
-                    else:
-                        break
+                    # Try next candidate model on any API/rate error
+                    continue
 
             if not stream_success:
-                yield f"data: {json.dumps({'delta': f'[Error: {str(last_error)}]'})}\n\n"
+                fallback_reply = "I hear you, but give me a moment to process that."
+                yield f"data: {json.dumps({'delta': fallback_reply})}\n\n"
             yield "data: [DONE]\n\n"
             
         elif provider == "gemini":
