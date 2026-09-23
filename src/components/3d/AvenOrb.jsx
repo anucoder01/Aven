@@ -11,6 +11,8 @@ function OrbCore({ state = 'idle', amplitude = 0 }) {
   const stateColors = {
     idle: { primary: '#2dd4bf', secondary: '#8b5cf6', emissive: '#0d9488' },
     listening: { primary: '#a78bfa', secondary: '#2dd4bf', emissive: '#7c3aed' },
+    thinking: { primary: '#38bdf8', secondary: '#818cf8', emissive: '#0284c7' },
+    hesitating: { primary: '#fb923c', secondary: '#c084fc', emissive: '#ea580c' },
     speaking: { primary: '#818cf8', secondary: '#c084fc', emissive: '#6366f1' },
     distortion: { primary: '#fb7185', secondary: '#f43f5e', emissive: '#be123c' },
     success: { primary: '#34d399', secondary: '#2dd4bf', emissive: '#059669' },
